@@ -209,3 +209,59 @@ body.tour-page{overflow:hidden;height:100vh}
 .page-hero{padding:72px 0 32px;text-align:center}
 .searchbar{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin:24px auto 0;max-width:640px}
 .searchbar input{flex:1;min-width:220px;padding:.8em 1.2em;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--text);font:inherit}
+
+/* checkpoints */
+.pv-hotspot{touch-action:none}
+.is-scene .pv-dot{width:38px;height:38px;background:rgba(79,209,197,.6);color:#fff}
+.pv-hotspot.is-ahead .pv-dot{background:var(--accent);color:#0b0d14;transform:scale(1.2);box-shadow:0 0 0 6px rgba(79,209,197,.3)}
+.pv-hotspot.is-ahead .pv-label{opacity:1;transform:none}
+.pv-hotspot.is-editable{cursor:grab} .pv-hotspot.is-editable .pv-label{opacity:1;transform:none}
+.pv-hotspot.is-dragging{cursor:grabbing} .pv-hotspot.is-dragging .pv-dot{transform:scale(1.25);animation:none}
+.pv-dot{transition:transform .15s,background .15s}
+
+/* walking controls */
+.walk-pad{position:absolute;left:16px;bottom:16px;z-index:5;display:grid;grid-template-columns:repeat(3,40px);grid-template-rows:repeat(2,40px);gap:4px}
+.walk-pad button{border-radius:10px;border:1px solid rgba(255,255,255,.2);background:rgba(11,13,20,.65);backdrop-filter:blur(8px);color:#fff;font-weight:700;cursor:pointer;font-size:.9rem;touch-action:none;user-select:none}
+.walk-pad button:hover,.walk-pad button.down{background:rgba(79,209,197,.55)}
+.walk-pad .k-w{grid-column:2;grid-row:1;opacity:.55} .walk-pad.can-walk .k-w{opacity:1;background:var(--accent);color:#0b0d14;border-color:transparent}
+.walk-pad .k-a{grid-column:1;grid-row:2} .walk-pad .k-s{grid-column:2;grid-row:2} .walk-pad .k-d{grid-column:3;grid-row:2}
+.walk-hint{position:absolute;left:calc(100% + 12px);bottom:8px;white-space:nowrap;font-size:.85rem;background:rgba(0,0,0,.55);padding:.3em .8em;border-radius:999px;color:#fff;pointer-events:none}
+.walk-hint:empty{display:none}
+.minimap{position:absolute;right:72px;top:76px;z-index:5;width:min(220px,40vw);border-radius:12px;overflow:hidden;border:1px solid rgba(255,255,255,.2);background:#fff;box-shadow:var(--shadow)}
+.minimap img,.plan img{display:block;width:100%;user-select:none}
+.minimap #map-pins,.plan{position:relative} .minimap #map-pins{position:absolute;inset:0}
+.pin{position:absolute;transform:translate(-50%,-50%);width:24px;height:24px;border-radius:50%;border:2px solid #fff;background:#3a4060;color:#fff;font-size:.72rem;font-weight:700;cursor:pointer;padding:0;display:grid;place-items:center;box-shadow:0 2px 6px rgba(0,0,0,.4)}
+.pin.on{background:var(--accent);color:#0b0d14;width:28px;height:28px;z-index:1}
+@media (max-width:700px){.scene-strip{left:auto;right:12px;transform:none;max-width:calc(100% - 170px)} .scene-strip button{width:84px} .scene-strip img{height:44px} .walk-hint{left:0;bottom:calc(100% + 8px)}}
+
+/* editor */
+.create-layout{grid-template-columns:300px 1fr 320px}
+.scene-item{align-items:stretch;cursor:pointer}
+.scene-item img{width:64px;height:44px;align-self:center;flex:0 0 auto}
+.scene-main{flex:1;min-width:0;display:grid;align-content:center}
+.scene-main input{font-weight:600;padding:2px 0;border-bottom:1px solid transparent}
+.scene-main input:focus{outline:none;border-bottom-color:var(--accent)}
+.scene-actions{display:grid;grid-template-columns:repeat(3,22px);align-items:center}
+.scene-actions button,.mini,.picker .x{background:none;border:0;color:var(--muted);cursor:pointer;font-size:1rem;padding:2px;border-radius:6px}
+.scene-actions button:hover:not(:disabled),.mini:hover{color:var(--text);background:var(--line)} .scene-actions button:disabled{opacity:.25;cursor:default}
+.tag{background:var(--grad);color:#0b0d14;border-radius:999px;padding:0 .5em;font-size:.72rem} .warn{color:#f6c453}
+.mode-bar{max-width:calc(100% - 24px);overflow-x:auto}
+.mode-bar button.primary{background:var(--grad);color:#0b0d14}
+.picker{position:absolute;top:70px;left:50%;transform:translateX(-50%);z-index:6;width:min(460px,calc(100% - 24px));background:rgba(18,21,33,.96);border:1px solid var(--line);border-radius:16px;padding:14px;box-shadow:var(--shadow)}
+.picker-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.picker-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px;max-height:42vh;overflow:auto}
+.picker-grid button{position:relative;border:2px solid transparent;border-radius:10px;overflow:hidden;padding:0;background:var(--card);color:var(--text);cursor:pointer;text-align:left;font:inherit}
+.picker-grid button:hover{border-color:var(--accent)}
+.picker-grid img{width:100%;height:68px;object-fit:cover}
+.picker-grid span{display:block;font-size:.8rem;padding:4px 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.picker-grid em{position:absolute;top:6px;right:6px;font-size:.68rem;font-style:normal;background:rgba(0,0,0,.65);padding:0 .5em;border-radius:999px}
+.check{display:flex;gap:8px;align-items:center;margin-top:10px;font-size:.9rem;color:var(--muted);cursor:pointer}
+.stage-tip{position:absolute;left:50%;bottom:20px;transform:translateX(-50%);z-index:5;max-width:calc(100% - 32px);background:rgba(11,13,20,.88);border:1px solid var(--line);padding:.6em 1.1em;border-radius:14px;font-size:.92rem;text-align:center}
+.steps-mini{list-style:none;padding:0;margin:0 0 20px;display:grid;gap:8px;counter-reset:g}
+.steps-mini li{counter-increment:g;display:flex;gap:10px;align-items:center;font-size:.9rem;color:var(--muted)}
+.steps-mini li::before{content:counter(g);flex:0 0 auto;width:22px;height:22px;border-radius:50%;display:grid;place-items:center;border:1px solid var(--line);font-size:.75rem;font-weight:700}
+.steps-mini li.done{color:var(--text)} .steps-mini li.done::before{content:"✓";background:var(--grad);color:#0b0d14;border-color:transparent}
+.hs-item.on{border-color:var(--accent)} .hs-item .field{margin:8px 0 0;font-size:.82rem} .hs-item .field input,.hs-item .field select,.hs-item .field textarea{padding:.45em .7em;border-radius:8px}
+.plan{border-radius:10px;overflow:hidden;border:1px solid var(--line);background:#fff;cursor:crosshair}
+.panel .row .field{min-width:0} .panel select{appearance:auto}
+button:disabled{opacity:.6;cursor:default}

@@ -11,7 +11,7 @@
   <div class="page-hero">
     <span class="eyebrow">Explore</span>
     <h1>Discover 360° tours</h1>
-    <p>Hotels, trails, venues and travel stories from the community.</p>
+    <p>Renders, homes, venues and travel stories published by the community.</p>
     <div class="searchbar"><input id="q" type="search" placeholder="Search tours, places or creators"></div>
     <div class="chips" id="cats" style="justify-content:center;margin-top:20px"></div>
   </div>
@@ -20,19 +20,21 @@
 </main>
 <script type="module">
   import './js/layout.js';
-  import { TOURS } from './js/data.js';
   import { cardHTML } from './js/cards.js';
-  const cats = ['All', ...new Set(TOURS.map(t => t.category))];
-  let cat = 'All';
+  import { demoCards, communityCards } from './js/tours.js';
+  let tours = demoCards(), cat = 'All';
   const catsEl = document.getElementById('cats'), q = document.getElementById('q');
   const render = () => {
+    const cats = ['All', ...new Set(tours.map(t => t.category).filter(Boolean))];
     const s = q.value.trim().toLowerCase();
-    const list = TOURS.filter(t => (cat === 'All' || t.category === cat) && (!s || [t.title, t.location, t.author, t.description].join(' ').toLowerCase().includes(s)));
+    const list = tours.filter(t => (cat === 'All' || t.category === cat) && (!s || [t.title, t.location, t.author, t.description].join(' ').toLowerCase().includes(s)));
     document.getElementById('grid').innerHTML = list.map(cardHTML).join('');
     document.getElementById('none').hidden = list.length > 0;
     catsEl.innerHTML = cats.map(c => `<button class="chip ${c === cat ? 'active' : ''}" data-c="${c}">${c}</button>`).join('');
   };
   catsEl.onclick = e => { const b = e.target.closest('[data-c]'); if (b) { cat = b.dataset.c; render(); } };
   q.oninput = render; render();
+  // tours published by the community come first, the built-in demos after them
+  communityCards().then(list => { if (list.length) { tours = [...list, ...tours]; render(); } });
 </script>
 </body></html>

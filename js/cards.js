@@ -1,5 +1,6 @@
 import { escapeHtml } from './viewer.js';
-export const cardHTML = t => `<a class="card" href="tour.html?id=${encodeURIComponent(t.id)}">
-  <div class="card-media"><img loading="lazy" src="${t.cover}" alt="${escapeHtml(t.title)} preview"><span class="badge">${escapeHtml(t.category)}</span><span class="badge badge-360">360°</span></div>
-  <div class="card-body"><h3>${escapeHtml(t.title)}</h3><p>${escapeHtml(t.description)}</p>
-  <div class="card-meta"><span>by ${escapeHtml(t.author)}</span><span>${t.scenes.length} scene${t.scenes.length > 1 ? 's' : ''} · ${(t.views || 0).toLocaleString()} views</span></div></div></a>`;
+import { tourHref } from './tours.js';
+export const cardHTML = t => `<a class="card" href="${tourHref(t)}">
+  <div class="card-media">${t.cover ? `<img loading="lazy" src="${escapeHtml(t.cover)}" alt="${escapeHtml(t.title)} preview">` : ''}<span class="badge">${escapeHtml(t.category || 'Tour')}</span><span class="badge badge-360">360°</span></div>
+  <div class="card-body"><h3>${escapeHtml(t.title)}</h3><p>${escapeHtml(t.description || t.location || '')}</p>
+  <div class="card-meta"><span>by ${escapeHtml(t.author || 'Unknown')}</span><span>${t.sceneCount} scene${t.sceneCount === 1 ? '' : 's'} · ${(t.views || 0).toLocaleString()} views</span></div></div></a>`;

@@ -10,24 +10,33 @@
 <div class="tour-shell">
   <div id="viewer"></div>
   <div class="tour-top">
-    <a class="icon-btn" href="explore.html" id="back" title="Back to Explore">←</a>
+    <a class="icon-btn" href="explore.html" id="back" title="Back">←</a>
     <div class="tour-title"><h1 id="t-title">Loading…</h1><span id="t-sub"></span></div>
-    <a class="logo" href="index.html" id="brand" style="margin-left:auto;font-size:1rem"><span class="logo-mark" style="width:24px;height:24px"></span>Around the World</a>
+    <a class="logo" href="index.html" id="brand" target="_blank" rel="noopener" style="margin-left:auto;font-size:1rem"><span class="logo-mark" style="width:24px;height:24px"></span>Around the World</a>
   </div>
   <div class="tour-controls">
     <button class="icon-btn on" id="b-rotate" title="Auto-rotate">⟲</button>
-    <button class="icon-btn" id="b-in" title="Zoom in">＋</button>
-    <button class="icon-btn" id="b-out" title="Zoom out">－</button>
+    <button class="icon-btn" id="b-in" title="Zoom in (+)">＋</button>
+    <button class="icon-btn" id="b-out" title="Zoom out (-)">－</button>
+    <button class="icon-btn" id="b-map" title="Floor plan (M)" hidden>🗺</button>
     <button class="icon-btn" id="b-gyro" title="Use device motion">📱</button>
-    <button class="icon-btn" id="b-full" title="Fullscreen">⛶</button>
+    <button class="icon-btn" id="b-full" title="Fullscreen (F)">⛶</button>
     <button class="icon-btn" id="b-share" title="Share">⤴</button>
   </div>
-  <div class="info-pop" id="info"><button class="modal-close" style="top:6px;right:10px" onclick="this.parentElement.classList.remove('open')">×</button><h3 id="i-title"></h3><p id="i-text" style="margin:0"></p></div>
+  <div class="walk-pad" id="pad" aria-label="Movement controls">
+    <button data-k="w" class="k-w" title="Walk forward (W)">W</button>
+    <button data-k="a" class="k-a" title="Turn left (A)">A</button>
+    <button data-k="s" class="k-s" title="Go back (S)">S</button>
+    <button data-k="d" class="k-d" title="Turn right (D)">D</button>
+    <span class="walk-hint" id="walk-hint"></span>
+  </div>
+  <div class="minimap" id="minimap" hidden><img id="map-img" alt="Floor plan"><div id="map-pins"></div></div>
+  <div class="info-pop" id="info"><button class="modal-close" style="top:6px;right:10px" id="info-x">×</button><h3 id="i-title"></h3><p id="i-text" style="margin:0"></p></div>
   <div class="scene-strip" id="strip"></div>
 </div>
 
 <div class="modal" id="share-modal"><div class="modal-box share-box">
-  <button class="modal-close" onclick="this.closest('.modal').classList.remove('open')">×</button>
+  <button class="modal-close" id="share-x">×</button>
   <h3>Share this tour</h3>
   <div id="qr"></div>
   <label class="field">Link<div class="row"><input id="s-link" readonly><button class="btn btn-sm" data-copy="s-link">Copy</button></div></label>
@@ -40,65 +49,128 @@
 <script type="module">
   import { toast } from './js/layout.js';
   import { PanoViewer, escapeHtml } from './js/viewer.js';
-  import { getTour } from './js/data.js';
-  import { getLocalTour, hydrate } from './js/db.js';
+  import { loadTour, linkLabel } from './js/tours.js';
+  import { bumpViews } from './js/cloud.js';
 
+  const $ = id => document.getElementById(id);
   const params = new URLSearchParams(location.search);
   const embed = params.has('embed');
-  let tour = params.get('local') ? await getLocalTour(params.get('local')).then(t => t && hydrate(t)) : getTour(params.get('id') || 'lakeside-retreat');
-  if (!tour) { document.getElementById('t-title').textContent = 'Tour not found'; throw new Error('missing tour'); }
-  if (embed) { document.getElementById('back').hidden = true; }
-  else document.getElementById('brand').hidden = true;
+  const tour = await loadTour(params).catch(e => { console.error(e); return null; });
+  if (!tour || !tour.scenes.length) {
+    $('t-title').textContent = 'Tour not found'; $('t-sub').textContent = 'The link may be wrong, or the tour was removed.';
+    for (const id of ['pad', 'strip']) $(id).hidden = true; document.querySelector('.tour-controls').hidden = true;
+    await new Promise(() => {});   // nothing more to set up on this page
+  }
+  $('back').hidden = embed; $('brand').hidden = !embed;
+  if (tour.kind === 'draft') { $('back').href = 'create.html?edit=' + tour.id; $('back').title = 'Back to the editor'; }
   document.title = tour.title + ' · Around the World';
-  document.getElementById('t-title').textContent = tour.title;
-  document.getElementById('t-sub').textContent = [tour.location, tour.author && 'by ' + tour.author].filter(Boolean).join(' · ');
+  $('t-title').textContent = tour.title;
+  $('t-sub').textContent = [tour.location, tour.author && 'by ' + tour.author].filter(Boolean).join(' · ');
+  if (tour.kind === 'cloud' && !sessionStorage.getItem('seen-' + tour.id)) { sessionStorage.setItem('seen-' + tour.id, 1); bumpViews(tour.id); }
 
-  const viewer = new PanoViewer(document.getElementById('viewer'), { autoRotate: 0.04 });
-  let current;
-  const strip = document.getElementById('strip');
+  const viewer = new PanoViewer($('viewer'), { autoRotate: 0.04, keyboard: 'global' });
+  const byId = id => tour.scenes.find(s => s.id === id);
+  const trail = [];           // scenes walked through, for S (go back)
+  let current = null, busy = false;
+
+  const strip = $('strip');
   strip.hidden = tour.scenes.length < 2;
-  strip.innerHTML = tour.scenes.map(s => `<button data-s="${s.id}"><img src="${s.thumbUrl || s.src.replace('/pano/', '/thumbs/')}" alt=""><span>${escapeHtml(s.title)}</span></button>`).join('');
-  strip.onclick = e => { const b = e.target.closest('[data-s]'); if (b) go(b.dataset.s); };
+  strip.innerHTML = tour.scenes.map(s => `<button data-s="${escapeHtml(s.id)}"><img src="${escapeHtml(s.thumbUrl)}" alt=""><span>${escapeHtml(s.title)}</span></button>`).join('');
+  strip.onclick = e => { const b = e.target.closest('[data-s]'); if (b && b.dataset.s !== current.id) go(b.dataset.s); };
 
-  function go(id) {
-    const s = tour.scenes.find(x => x.id === id) || tour.scenes[0];
-    current = s.id; document.getElementById('info').classList.remove('open');
+  // Arrive facing the way you were walking: away from the link that leads back to where you came from.
+  function arrivalView(scene, fromId) {
+    const back = fromId && scene.hotspots.find(h => h.type === 'scene' && h.target === fromId);
+    return back ? { yaw: back.yaw + 180, pitch: 0 } : { yaw: scene.yaw || 0, pitch: scene.pitch || 0 };
+  }
+  async function go(id, { from = null, record = true } = {}) {
+    const s = byId(id) || tour.scenes[0];
+    if (record && current) trail.push(current.id);
+    current = s; $('info').classList.remove('open');
     strip.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.s === s.id));
-    viewer.load(s.src, { yaw: s.yaw || 0, pitch: s.pitch || 0, hotspots: s.hotspots || [] });
+    strip.querySelector('.on')?.scrollIntoView({ block: 'nearest', inline: 'center' });
+    renderPins();
     const u = new URL(location); u.searchParams.set('scene', s.id); history.replaceState(null, '', u);
+    const hotspots = s.hotspots.filter(h => h.type !== 'scene' || byId(h.target)).map(h => ({ ...h, label: linkLabel(h, tour.scenes) }));
+    try { await viewer.load(s.src, { ...arrivalView(s, from), hotspots }); } catch { toast('This panorama could not be loaded'); }
+  }
+  // walk through a scene link: turn toward it, lean in, then switch scenes
+  async function travel(link, opts) {
+    if (busy) return; busy = true;
+    await viewer.flyTo(link.yaw, Math.max(link.pitch, -20) * 0.5, Math.max(viewer.opts.minFov, viewer.fov - 22), 380);
+    await go(link.target, { from: current.id, ...opts }); busy = false;
   }
   viewer.on('hotspot', h => {
-    if (h.type === 'scene') return go(h.target);
-    document.getElementById('i-title').textContent = h.label; document.getElementById('i-text').textContent = h.text || '';
-    document.getElementById('info').classList.add('open');
+    if (h.type === 'scene') return travel(h);
+    $('i-title').textContent = h.label; $('i-text').textContent = h.text || ''; $('info').classList.add('open');
   });
-  go(params.get('scene') || tour.scenes[0].id);
+  viewer.on('walk', ({ dir, link }) => {
+    if (busy) return;
+    if (dir > 0) return link ? travel(link) : hint('Turn toward an arrow, then press W');
+    // S: retrace the last step, or take a link that is behind you
+    const prev = trail.pop();
+    if (prev) { const back = current.hotspots.find(h => h.type === 'scene' && h.target === prev); return back ? travel(back, { record: false }) : go(prev, { from: current.id, record: false }); }
+    link ? travel(link) : hint('Nothing behind you here');
+  });
+  viewer.on('ahead', link => { $('pad').classList.toggle('can-walk', !!link); if (link) hint('W: ' + link.label, 0); else hint('', 0); });
+  let hintTimer; const hintEl = $('walk-hint');
+  function hint(text, ms = 1800) { clearTimeout(hintTimer); hintEl.textContent = text; if (ms) hintTimer = setTimeout(() => hintEl.textContent = viewer.ahead ? 'W: ' + viewer.ahead.data.label : '', ms); }
 
-  const rot = document.getElementById('b-rotate');
+  // on-screen WASD pad (also the way to walk on touch screens)
+  const pad = $('pad'); const CODE = { a: 'KeyA', d: 'KeyD' };
+  pad.addEventListener('pointerdown', e => {
+    const b = e.target.closest('[data-k]'); if (!b) return; e.preventDefault(); const k = b.dataset.k;
+    if (k === 'w' || k === 's') return viewer.walk(k === 'w' ? 1 : -1);
+    viewer.keys.add(CODE[k]); viewer._idleSince = Infinity; b.setPointerCapture(e.pointerId);
+  });
+  ['pointerup', 'pointercancel'].forEach(t => pad.addEventListener(t, e => { const b = e.target.closest('[data-k]'); if (b && CODE[b.dataset.k]) { viewer.keys.delete(CODE[b.dataset.k]); viewer._idleSince = performance.now(); } }));
+  addEventListener('keydown', e => { const b = pad.querySelector('[data-k="' + (e.key || '').toLowerCase() + '"]'); if (b && !e.target.closest('input,textarea')) b.classList.add('down'); });
+  addEventListener('keyup', e => pad.querySelector('[data-k="' + (e.key || '').toLowerCase() + '"]')?.classList.remove('down'));
+
+  // floor plan
+  const fp = tour.floorplan && tour.floorplan.src && Object.keys(tour.floorplan.markers || {}).length ? tour.floorplan : null;
+  if (fp) { $('b-map').hidden = false; $('map-img').src = fp.src; $('minimap').hidden = innerWidth < 700; $('b-map').classList.toggle('on', !$('minimap').hidden); }
+  function renderPins() {
+    if (!fp) return;
+    $('map-pins').innerHTML = tour.scenes.map((s, i) => { const m = fp.markers[s.id]; return m ? `<button class="pin ${s.id === current.id ? 'on' : ''}" style="left:${m.x * 100}%;top:${m.y * 100}%" data-s="${escapeHtml(s.id)}" title="${escapeHtml(s.title)}">${i + 1}</button>` : ''; }).join('');
+  }
+  $('map-pins').onclick = e => { const b = e.target.closest('[data-s]'); if (b && b.dataset.s !== current.id) go(b.dataset.s); };
+  $('b-map').onclick = () => { const m = $('minimap'); m.hidden = !m.hidden; $('b-map').classList.toggle('on', !m.hidden); };
+
+  await go(params.get('scene') || tour.scenes[0].id, { record: false });
+
+  const rot = $('b-rotate');
   rot.onclick = () => { const on = !rot.classList.contains('on'); rot.classList.toggle('on', on); viewer.setAutoRotate(on ? 0.04 : 0); };
-  document.getElementById('b-in').onclick = () => viewer.zoom(-10);
-  document.getElementById('b-out').onclick = () => viewer.zoom(10);
-  document.getElementById('b-gyro').onclick = () => {
+  $('b-in').onclick = () => viewer.zoom(-10);
+  $('b-out').onclick = () => viewer.zoom(10);
+  $('b-gyro').onclick = () => {
     if (!('DeviceOrientationEvent' in window) || !matchMedia('(pointer:coarse)').matches) return toast('Device motion works on phones and tablets');
     viewer.enableGyro().then(ok => toast(ok ? 'Tilt your device to look around' : 'Motion access denied'));
   };
-  document.getElementById('b-full').onclick = () => document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen?.();
-  addEventListener('keydown', e => { if (e.key === 'f') document.getElementById('b-full').click(); });
+  $('b-full').onclick = () => document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen?.();
+  addEventListener('keydown', e => {
+    if (e.target.closest('input,textarea') || e.ctrlKey || e.metaKey) return;
+    if (e.code === 'KeyF') $('b-full').click();
+    if (e.code === 'KeyM' && fp) $('b-map').click();
+  });
+  $('info-x').onclick = () => $('info').classList.remove('open');
+  $('share-x').onclick = () => $('share-modal').classList.remove('open');
 
-  document.getElementById('b-share').onclick = () => {
+  $('b-share').onclick = () => {
     const u = new URL(location); u.searchParams.delete('embed');
     const link = u.href, em = new URL(u); em.searchParams.set('embed', '1');
-    document.getElementById('s-link').value = link;
-    document.getElementById('s-embed').value = `<iframe src="${em.href}" width="100%" height="480" style="border:0;border-radius:12px" allow="fullscreen; gyroscope; accelerometer" allowfullscreen loading="lazy"></iframe>`;
-    document.getElementById('s-x').href = 'https://twitter.com/intent/tweet?url=' + encodeURIComponent(link) + '&text=' + encodeURIComponent(tour.title + ' in 360°');
-    document.getElementById('s-fb').href = 'https://www.facebook.com/sharer/sharer.php?u=' + encodeURIComponent(link);
-    document.getElementById('s-note').textContent = tour.local ? 'This tour is saved in this browser only, so the link works on this device. Publishing to the cloud is a PRO feature planned for a later release.' : '';
-    if (window.qrcode) { const q = qrcode(0, 'M'); q.addData(link); q.make(); document.getElementById('qr').innerHTML = q.createSvgTag(4, 0); }
-    document.getElementById('share-modal').classList.add('open');
+    $('s-link').value = link;
+    $('s-embed').value = `<iframe src="${em.href}" width="100%" height="480" style="border:0;border-radius:12px" allow="fullscreen; gyroscope; accelerometer" allowfullscreen loading="lazy"></iframe>`;
+    $('s-x').href = 'https://twitter.com/intent/tweet?url=' + encodeURIComponent(link) + '&text=' + encodeURIComponent(tour.title + ' in 360°');
+    $('s-fb').href = 'https://www.facebook.com/sharer/sharer.php?u=' + encodeURIComponent(link);
+    $('s-note').textContent = tour.kind === 'draft' ? 'This is a draft saved in this browser, so the link only works on this device. Publish it from the editor to share it with anyone.' : '';
+    if (window.qrcode) { const q = qrcode(0, 'M'); q.addData(link); q.make(); $('qr').innerHTML = q.createSvgTag(4, 0); }
+    $('share-modal').classList.add('open');
   };
   document.querySelectorAll('[data-copy]').forEach(b => b.onclick = e => {
-    e.preventDefault(); const el = document.getElementById(b.dataset.copy);
+    e.preventDefault(); const el = $(b.dataset.copy);
     navigator.clipboard?.writeText(el.value).then(() => toast('Copied'), () => { el.select(); document.execCommand('copy'); toast('Copied'); });
   });
+  if (!embed && !localStorage.getItem('atw-wasd-tip') && matchMedia('(pointer:fine)').matches) { localStorage.setItem('atw-wasd-tip', 1); setTimeout(() => toast('Tip: A and D turn, W walks toward an arrow, S goes back'), 1200); }
 </script>
 </body></html>

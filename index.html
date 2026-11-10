@@ -56,16 +56,16 @@
       <div class="feature-media">
         <div class="mock-editor">
           <div class="mock-side"><div class="on" style="background-image:url(assets/thumbs/alpine-lake.jpg)"></div><div style="background-image:url(assets/thumbs/night-sky.jpg)"></div><div style="background-image:url(assets/thumbs/desert-dusk.jpg)"></div></div>
-          <div class="mock-stage" id="feat-viewer-2"><div class="mock-toolbar"><span>＋ Scene link</span><span>ⓘ Info point</span><span>◎ Set start view</span></div></div>
+          <div class="mock-stage" id="feat-viewer-2"><div class="mock-toolbar"><span>＋ Checkpoint</span><span>ⓘ Info point</span><span>◎ Set start view</span></div></div>
         </div>
       </div>
       <div>
         <h2>An editor that stays out of your way</h2>
         <ul class="feature-list">
-          <li><b>Scene links</b>Click anywhere in a panorama to drop a hotspot that walks visitors to the next room.</li>
+          <li><b>Checkpoints</b>Pick the next scene, drop it on the doorway and the way back is added for you.</li>
           <li><b>Info points</b>Add titles and notes to highlight details worth a closer look.</li>
           <li><b>Start view</b>Choose exactly where each scene opens so the first impression lands.</li>
-          <li><b>Auto-rotate and zoom</b>Tune the pace of the tour for kiosks, listings or social posts.</li>
+          <li><b>Floor plans</b>Upload a plan, pin each scene, and visitors get a mini map to jump around.</li>
         </ul>
         <a class="btn btn-primary" href="create.html">Open the editor</a>
       </div>
@@ -95,7 +95,7 @@
       <div>
         <h2>One tour, every screen</h2>
         <p>Tours adapt to the device in hand: drag on desktop, swipe or tilt on phones, and look around naturally in a VR headset browser.</p>
-        <p>Fullscreen mode, gyroscope control and pinch-to-zoom come built in.</p>
+        <p>Walk through with W, A, S and D on a keyboard. Fullscreen mode, gyroscope control and pinch-to-zoom come built in.</p>
         <a class="btn btn-primary" href="explore.html">See it on your phone</a>
       </div>
     </div>
@@ -105,7 +105,7 @@
     <div class="section-head"><span class="eyebrow">How it works</span><h2>From photo to tour in three steps</h2></div>
     <div class="steps">
       <div class="step"><h3>Upload</h3><p>Drop one or more equirectangular panoramas into the editor.</p></div>
-      <div class="step"><h3>Connect</h3><p>Click to add scene links and info points, then set each start view.</p></div>
+      <div class="step"><h3>Connect</h3><p>Add checkpoints between scenes and info points, then set each start view.</p></div>
       <div class="step"><h3>Share</h3><p>Publish and send a link, embed it, or print the QR code.</p></div>
     </div>
   </div></section>
@@ -146,7 +146,7 @@
 <script type="module">
   import './js/layout.js';
   import { PanoViewer } from './js/viewer.js';
-  import { TOURS } from './js/data.js';
+  import { demoCards } from './js/tours.js';
   import { cardHTML } from './js/cards.js';
 
   // on touch screens the inline viewers just auto-rotate so they never trap page scrolling
@@ -163,7 +163,7 @@
     new PanoViewer(holder, { autoRotate: 0.08, interactive }).load(src, { pitch: e.target.id === 'feat-viewer-3' ? 25 : 0 });
   }), { rootMargin: '200px' });
   lazy.forEach(([id]) => io.observe(document.getElementById(id)));
-  document.getElementById('demo-grid').innerHTML = TOURS.slice(0, 3).map(cardHTML).join('');
+  document.getElementById('demo-grid').innerHTML = demoCards().slice(0, 3).map(cardHTML).join('');
 </script>
 </body>
 </html>

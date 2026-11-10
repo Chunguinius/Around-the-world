@@ -1,4 +1,4 @@
-// Tours created in the editor are stored locally in the browser (IndexedDB).
+// Drafts: tours being edited are kept in this browser (IndexedDB) until they are published.
 const DB = 'around-the-world', STORE = 'tours';
 function open() {
   return new Promise((res, rej) => {
@@ -9,14 +9,9 @@ function open() {
 }
 async function tx(mode, fn) {
   const db = await open();
-  return new Promise((res, rej) => { const t = db.transaction(STORE, mode); const out = fn(t.objectStore(STORE)); t.oncomplete = () => res(out.result ?? out); t.onerror = () => rej(t.error); });
+  return new Promise((res, rej) => { const t = db.transaction(STORE, mode); const out = fn(t.objectStore(STORE)); t.oncomplete = () => res(out.result); t.onerror = () => rej(t.error); });
 }
-export const saveTour = tour => tx('readwrite', s => s.put(tour));
-export const getLocalTour = id => tx('readonly', s => s.get(id));
-export const listLocalTours = () => tx('readonly', s => s.getAll());
-export const deleteLocalTour = id => tx('readwrite', s => s.delete(id));
-// turn stored blobs into object URLs the viewer can load
-export function hydrate(tour) {
-  return { ...tour, local: true, cover: tour.scenes[0] ? URL.createObjectURL(tour.scenes[0].thumb || tour.scenes[0].blob) : '',
-    scenes: tour.scenes.map(s => ({ ...s, src: URL.createObjectURL(s.blob), thumbUrl: URL.createObjectURL(s.thumb || s.blob) })) };
-}
+export const saveDraft = tour => tx('readwrite', s => s.put(tour));
+export const getDraft = id => tx('readonly', s => s.get(id));
+export const listDrafts = () => tx('readonly', s => s.getAll());
+export const deleteDraft = id => tx('readwrite', s => s.delete(id));
