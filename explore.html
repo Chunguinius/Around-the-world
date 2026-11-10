@@ -15,6 +15,7 @@
     <div class="searchbar"><input id="q" type="search" placeholder="Search tours, places or creators"></div>
     <div class="chips" id="cats" style="justify-content:center;margin-top:20px"></div>
   </div>
+  <div class="toolbar-row"><span id="count"></span><label>Sort by <select id="sort"><option value="new">Newest</option><option value="views">Most viewed</option><option value="az">Name</option></select></label></div>
   <div class="grid" id="grid" style="margin-bottom:80px"></div>
   <p id="none" class="empty" hidden>No tours match that search.</p>
 </main>
@@ -22,19 +23,23 @@
   import './js/layout.js';
   import { cardHTML } from './js/cards.js';
   import { demoCards, communityCards } from './js/tours.js';
-  let tours = demoCards(), cat = 'All';
+  import { cloudEnabled } from './js/cloud.js';
+  let tours = demoCards(), cat = 'All', loading = cloudEnabled;
   const catsEl = document.getElementById('cats'), q = document.getElementById('q');
   const render = () => {
     const cats = ['All', ...new Set(tours.map(t => t.category).filter(Boolean))];
     const s = q.value.trim().toLowerCase();
     const list = tours.filter(t => (cat === 'All' || t.category === cat) && (!s || [t.title, t.location, t.author, t.description].join(' ').toLowerCase().includes(s)));
-    document.getElementById('grid').innerHTML = list.map(cardHTML).join('');
+    const sort = document.getElementById('sort').value;
+    if (sort === 'views') list.sort((a, b) => (b.views || 0) - (a.views || 0)); else if (sort === 'az') list.sort((a, b) => a.title.localeCompare(b.title));
+    document.getElementById('count').textContent = list.length + (list.length === 1 ? ' tour' : ' tours');
+    document.getElementById('grid').innerHTML = list.map(cardHTML).join('') + (loading ? '<div class="skeleton"></div>' : '');
     document.getElementById('none').hidden = list.length > 0;
     catsEl.innerHTML = cats.map(c => `<button class="chip ${c === cat ? 'active' : ''}" data-c="${c}">${c}</button>`).join('');
   };
   catsEl.onclick = e => { const b = e.target.closest('[data-c]'); if (b) { cat = b.dataset.c; render(); } };
-  q.oninput = render; render();
+  q.oninput = render; document.getElementById('sort').onchange = render; render();
   // tours published by the community come first, the built-in demos after them
-  communityCards().then(list => { if (list.length) { tours = [...list, ...tours]; render(); } });
+  communityCards().then(list => { loading = false; tours = [...list, ...tours]; render(); });
 </script>
 </body></html>

@@ -28,6 +28,7 @@ function header() {
   </div>`;
   document.body.prepend(h);
   h.querySelector('#menu-btn').onclick = () => h.querySelector('#nav').classList.toggle('open');
+  const onScroll = () => h.classList.toggle('scrolled', scrollY > 8); addEventListener('scroll', onScroll, { passive: true }); onScroll();
   whoami.then(u => {
     const box = h.querySelector('#header-actions');
     box.innerHTML = u

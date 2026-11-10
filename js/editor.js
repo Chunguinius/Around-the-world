@@ -237,7 +237,7 @@ function renderPlan() {
   const fp = tour.floorplan, box = $('plan-box');
   if (!fp) { box.innerHTML = `<label class="btn btn-sm" style="width:100%;justify-content:center">Upload a floor plan<input type="file" id="plan-file" accept="image/jpeg,image/png,image/webp" hidden></label><p class="small" style="margin-top:8px">Visitors get a mini map and can jump between rooms.</p>`; return; }
   const s = scene();
-  box.innerHTML = `<div class="plan" id="plan"><img src="${planSrc(fp)}" alt="Floor plan" draggable="false">${tour.scenes.map((x, i) => fp.markers[x.id] ? `<button class="pin ${x.id === cur ? 'on' : ''}" style="left:${fp.markers[x.id].x * 100}%;top:${fp.markers[x.id].y * 100}%" data-pin="${x.id}" title="${escapeHtml(x.title)}">${i + 1}</button>` : '').join('')}</div>
+  box.innerHTML = `<div class="fplan" id="plan"><img src="${planSrc(fp)}" alt="Floor plan" draggable="false">${tour.scenes.map((x, i) => fp.markers[x.id] ? `<button class="pin ${x.id === cur ? 'on' : ''}" style="left:${fp.markers[x.id].x * 100}%;top:${fp.markers[x.id].y * 100}%" data-pin="${x.id}" title="${escapeHtml(x.title)}">${i + 1}</button>` : '').join('')}</div>
     <p class="small" style="margin-top:8px">${s ? `Click the plan to place <b>${escapeHtml(s.title)}</b>. ` : ''}${Object.keys(fp.markers).length} of ${tour.scenes.length} scenes placed.</p>
     <div class="row"><button class="btn btn-sm btn-ghost" id="plan-clear" ${s && fp.markers[s.id] ? '' : 'disabled'}>Remove this marker</button><button class="btn btn-sm btn-ghost" id="plan-remove">Remove plan</button></div>`;
 }

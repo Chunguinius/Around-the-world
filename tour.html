@@ -10,18 +10,31 @@
 <div class="tour-shell">
   <div id="viewer"></div>
   <div class="tour-top">
-    <a class="icon-btn" href="explore.html" id="back" title="Back">←</a>
+    <a class="icon-btn" href="explore.html" id="back" title="Back" aria-label="Back"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></a>
     <div class="tour-title"><h1 id="t-title">Loading…</h1><span id="t-sub"></span></div>
     <a class="logo" href="index.html" id="brand" target="_blank" rel="noopener" style="margin-left:auto;font-size:1rem"><span class="logo-mark" style="width:24px;height:24px"></span>Around the World</a>
   </div>
   <div class="tour-controls">
-    <button class="icon-btn on" id="b-rotate" title="Auto-rotate">⟲</button>
-    <button class="icon-btn" id="b-in" title="Zoom in (+)">＋</button>
-    <button class="icon-btn" id="b-out" title="Zoom out (-)">－</button>
-    <button class="icon-btn" id="b-map" title="Floor plan (M)" hidden>🗺</button>
-    <button class="icon-btn" id="b-gyro" title="Use device motion">📱</button>
-    <button class="icon-btn" id="b-full" title="Fullscreen (F)">⛶</button>
-    <button class="icon-btn" id="b-share" title="Share">⤴</button>
+    <button class="icon-btn on" id="b-rotate" title="Auto-rotate" aria-label="Auto-rotate"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.6-5.9"/><path d="M20 4v5h-5"/></svg></button>
+    <button class="icon-btn" id="b-in" title="Zoom in (+)" aria-label="Zoom in"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3M11 8v6M8 11h6"/></svg></button>
+    <button class="icon-btn" id="b-out" title="Zoom out (-)" aria-label="Zoom out"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3M8 11h6"/></svg></button>
+    <button class="icon-btn" id="b-map" title="Floor plan (M)" aria-label="Floor plan" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2-6-2z"/><path d="M9 4v14M15 6v14"/></svg></button>
+    <button class="icon-btn" id="b-gyro" title="Use device motion" aria-label="Use device motion"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="3" width="10" height="18" rx="2"/><path d="M11 18h2"/></svg></button>
+    <button class="icon-btn" id="b-full" title="Fullscreen (F)" aria-label="Fullscreen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
+    <button class="icon-btn" id="b-share" title="Share" aria-label="Share"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8.2 10.9l7.6-3.8M8.2 13.1l7.6 3.8"/></svg></button>
+    <button class="icon-btn" id="b-help" title="Controls (?)" aria-label="Controls"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.6 2.2c-.7.4-1.1 1-1.1 1.8M12 17h.01"/></svg></button>
+  </div>
+  <div class="scene-name" id="scene-name"></div>
+  <div class="help-pop" id="help" hidden>
+    <h3>How to move</h3>
+    <dl>
+      <dt><span class="kbd">Drag</span></dt><dd>Look around</dd>
+      <dt><span class="kbd">A</span> <span class="kbd">D</span></dt><dd>Turn left and right</dd>
+      <dt><span class="kbd">W</span></dt><dd>Walk to the highlighted checkpoint</dd>
+      <dt><span class="kbd">S</span></dt><dd>Go back the way you came</dd>
+      <dt><span class="kbd">Scroll</span></dt><dd>Zoom in and out</dd>
+      <dt><span class="kbd">F</span> <span class="kbd">M</span></dt><dd>Fullscreen and floor plan</dd>
+    </dl>
   </div>
   <div class="walk-pad" id="pad" aria-label="Movement controls">
     <button data-k="w" class="k-w" title="Walk forward (W)">W</button>
@@ -89,11 +102,13 @@
     current = s; $('info').classList.remove('open');
     strip.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.s === s.id));
     strip.querySelector('.on')?.scrollIntoView({ block: 'nearest', inline: 'center' });
-    renderPins();
+    renderPins(); showSceneName(s.title);
     const u = new URL(location); u.searchParams.set('scene', s.id); history.replaceState(null, '', u);
     const hotspots = s.hotspots.filter(h => h.type !== 'scene' || byId(h.target)).map(h => ({ ...h, label: linkLabel(h, tour.scenes) }));
     try { await viewer.load(s.src, { ...arrivalView(s, from), hotspots }); } catch { toast('This panorama could not be loaded'); }
   }
+  let nameTimer;
+  function showSceneName(t) { if (tour.scenes.length < 2) return; const el = $('scene-name'); el.textContent = t; el.classList.add('show'); clearTimeout(nameTimer); nameTimer = setTimeout(() => el.classList.remove('show'), 2200); }
   // walk through a scene link: turn toward it, lean in, then switch scenes
   async function travel(link, opts) {
     if (busy) return; busy = true;
@@ -152,7 +167,10 @@
     if (e.target.closest('input,textarea') || e.ctrlKey || e.metaKey) return;
     if (e.code === 'KeyF') $('b-full').click();
     if (e.code === 'KeyM' && fp) $('b-map').click();
+    if (e.key === '?') $('b-help').click();
+    if (e.key === 'Escape') { $('help').hidden = true; $('b-help').classList.remove('on'); $('info').classList.remove('open'); }
   });
+  $('b-help').onclick = () => { const h = $('help'); h.hidden = !h.hidden; $('b-help').classList.toggle('on', !h.hidden); };
   $('info-x').onclick = () => $('info').classList.remove('open');
   $('share-x').onclick = () => $('share-modal').classList.remove('open');
 
@@ -171,6 +189,6 @@
     e.preventDefault(); const el = $(b.dataset.copy);
     navigator.clipboard?.writeText(el.value).then(() => toast('Copied'), () => { el.select(); document.execCommand('copy'); toast('Copied'); });
   });
-  if (!embed && !localStorage.getItem('atw-wasd-tip') && matchMedia('(pointer:fine)').matches) { localStorage.setItem('atw-wasd-tip', 1); setTimeout(() => toast('Tip: A and D turn, W walks toward an arrow, S goes back'), 1200); }
+  if (!embed && !localStorage.getItem('atw-wasd-tip') && matchMedia('(pointer:fine)').matches) { localStorage.setItem('atw-wasd-tip', 1); setTimeout(() => { $('b-help').click(); setTimeout(() => { $('help').hidden = true; $('b-help').classList.remove('on'); }, 8000); }, 900); }
 </script>
 </body></html>

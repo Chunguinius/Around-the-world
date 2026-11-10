@@ -14,7 +14,7 @@
     <div class="hero-viewer" id="hero-viewer"></div>
     <div class="container">
       <div class="hero-content">
-        <span class="eyebrow">Free 360° tour builder</span>
+        <span class="hero-badge"><i></i>Free 360° tour builder · drag the background</span>
         <h1>Step inside any place with <span class="grad-text">immersive 360° tours</span></h1>
         <p style="font-size:1.15rem">Upload panoramic photos, link them with hotspots, and publish a tour people can explore on any screen. No installs, no code.</p>
         <ul>
@@ -163,6 +163,8 @@
     new PanoViewer(holder, { autoRotate: 0.08, interactive }).load(src, { pitch: e.target.id === 'feat-viewer-3' ? 25 : 0 });
   }), { rootMargin: '200px' });
   lazy.forEach(([id]) => io.observe(document.getElementById(id)));
+  const seen = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { e.target.classList.add('in'); seen.unobserve(e.target); } }), { rootMargin: '0px 0px -8% 0px' });
+  document.querySelectorAll('.feature, .section-head, .step, .quote, .pro-cta, .faq, .stats-grid').forEach(el => { el.classList.add('reveal'); seen.observe(el); });
   document.getElementById('demo-grid').innerHTML = demoCards().slice(0, 3).map(cardHTML).join('');
 </script>
 </body>
