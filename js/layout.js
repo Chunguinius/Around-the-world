@@ -1,11 +1,11 @@
 // Shared header, footer, auth modal and toast. Auth is a front-end demo (stored in localStorage).
-const BRAND = 'Orbit360';
+const BRAND = 'Around the World';
 const page = document.body.dataset.page || '';
 const store = {
   get(k, d) { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } },
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
 };
-const user = () => store.get('o360-user', null);
+const user = () => store.get('atw-user', null);
 
 function header() {
   const links = [['index.html', 'Home', 'home'], ['explore.html', 'Explore', 'explore'], ['create.html', 'Create', 'create'], ['create.html#my-tours', 'My tours', 'mine'], ['pricing.html', 'Pricing', 'pricing']];
@@ -23,7 +23,7 @@ function header() {
   </div>`;
   document.body.prepend(h);
   h.querySelector('#menu-btn').onclick = () => h.querySelector('#nav').classList.toggle('open');
-  const lo = h.querySelector('#logout-btn'); if (lo) lo.onclick = () => { store.set('o360-user', null); location.reload(); };
+  const lo = h.querySelector('#logout-btn'); if (lo) lo.onclick = () => { store.set('atw-user', null); location.reload(); };
 }
 
 function footer() {
@@ -62,7 +62,7 @@ function authModal() {
   m.querySelector('form').onsubmit = e => {
     e.preventDefault(); const d = new FormData(e.target);
     if (mode === 'signup' && d.get('password') !== d.get('confirm')) return toast('Passwords do not match');
-    store.set('o360-user', { email: d.get('email') }); toast(mode === 'signup' ? 'Account created' : 'Welcome back'); setTimeout(() => location.reload(), 700);
+    store.set('atw-user', { email: d.get('email') }); toast(mode === 'signup' ? 'Account created' : 'Welcome back'); setTimeout(() => location.reload(), 700);
   };
   document.addEventListener('click', e => {
     const t = e.target.closest('[data-auth]'); if (t) { e.preventDefault(); setMode(t.dataset.auth); m.classList.add('open'); }

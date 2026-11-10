@@ -1,5 +1,5 @@
 // Tours created in the editor are stored locally in the browser (IndexedDB).
-const DB = 'orbit360', STORE = 'tours';
+const DB = 'around-the-world', STORE = 'tours';
 function open() {
   return new Promise((res, rej) => {
     const r = indexedDB.open(DB, 1);

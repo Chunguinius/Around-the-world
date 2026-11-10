@@ -1,7 +1,7 @@
 // Demo tours shipped with the site. Panoramas are original, procedurally generated images.
 export const TOURS = [
   {
-    id: 'lakeside-retreat', title: 'Lakeside Retreat', category: 'Hospitality', author: 'Orbit360 Studio',
+    id: 'lakeside-retreat', title: 'Lakeside Retreat', category: 'Hospitality', author: 'Around the World Studio',
     location: 'Alpine valley', views: 12840, cover: 'assets/thumbs/alpine-lake.jpg',
     description: 'A two-scene walkthrough of a mountain lodge: the lakefront at golden hour and the campfire meadow after dark.',
     scenes: [
@@ -55,7 +55,7 @@ export const TOURS = [
     scenes: [ { id: 'lake', title: 'Lake', src: 'assets/pano/alpine-lake.jpg', yaw: 180, pitch: 0, hotspots: [] } ]
   },
   {
-    id: 'desert-event', title: 'Desert Festival Grounds', category: 'Events', author: 'Orbit360 Studio',
+    id: 'desert-event', title: 'Desert Festival Grounds', category: 'Events', author: 'Around the World Studio',
     location: 'Open desert', views: 7790, cover: 'assets/thumbs/desert-dusk.jpg',
     description: 'Preview the festival site before you arrive.',
     scenes: [ { id: 'site', title: 'Main stage area', src: 'assets/pano/desert-dusk.jpg', yaw: 90, pitch: 0, hotspots: [] } ]

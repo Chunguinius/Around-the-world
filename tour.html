@@ -4,7 +4,7 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g'%3E%3Cstop stop-color='%234fd1c5'/%3E%3Cstop offset='1' stop-color='%237c6cff'/%3E%3C/linearGradient%3E%3C/defs%3E%3Ccircle cx='16' cy='16' r='16' fill='url(%23g)'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/style.css">
-<title>Tour · Orbit360</title>
+<title>Tour · Around the World</title>
 </head>
 <body class="tour-page">
 <div class="tour-shell">
@@ -12,7 +12,7 @@
   <div class="tour-top">
     <a class="icon-btn" href="explore.html" id="back" title="Back to Explore">←</a>
     <div class="tour-title"><h1 id="t-title">Loading…</h1><span id="t-sub"></span></div>
-    <a class="logo" href="index.html" id="brand" style="margin-left:auto;font-size:1rem"><span class="logo-mark" style="width:24px;height:24px"></span>Orbit360</a>
+    <a class="logo" href="index.html" id="brand" style="margin-left:auto;font-size:1rem"><span class="logo-mark" style="width:24px;height:24px"></span>Around the World</a>
   </div>
   <div class="tour-controls">
     <button class="icon-btn on" id="b-rotate" title="Auto-rotate">⟲</button>
@@ -49,7 +49,7 @@
   if (!tour) { document.getElementById('t-title').textContent = 'Tour not found'; throw new Error('missing tour'); }
   if (embed) { document.getElementById('back').hidden = true; }
   else document.getElementById('brand').hidden = true;
-  document.title = tour.title + ' · Orbit360';
+  document.title = tour.title + ' · Around the World';
   document.getElementById('t-title').textContent = tour.title;
   document.getElementById('t-sub').textContent = [tour.location, tour.author && 'by ' + tour.author].filter(Boolean).join(' · ');
 

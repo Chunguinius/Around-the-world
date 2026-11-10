@@ -1,4 +1,4 @@
-# Orbit360
+# Around the World
 
 A static website for creating and sharing 360° panoramic virtual tours.
 

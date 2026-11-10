@@ -1,4 +1,4 @@
-// Orbit360 panorama viewer: equirectangular images on an inverted sphere (three.js)
+// Around the World panorama viewer: equirectangular images on an inverted sphere (three.js)
 import * as THREE from './vendor/three.module.min.js';
 
 const DEG = Math.PI / 180;
