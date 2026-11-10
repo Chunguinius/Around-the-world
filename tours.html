@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23e1ff15'/%3E%3Cg fill='none' stroke='%2316181d' stroke-width='2.2'%3E%3Ccircle cx='16' cy='16' r='8'/%3E%3Cpath d='M8 16h16M16 8c3 3 3 13 0 16M16 8c-3 3-3 13 0 16'/%3E%3C/g%3E%3C/svg%3E">
+<link rel="stylesheet" href="css/style.css">
+<title>My virtual tours · Around the World</title>
+</head>
+<body data-page="mine" data-side="tours" data-nofooter="1">
+<div class="app">
+  <aside class="side" id="side"></aside>
+  <main class="main">
+    <div class="page-head">
+      <span class="tile" id="head-icon"></span>
+      <div><h1>My virtual tours</h1><p>Manage, share and edit all your tours in one place.</p></div>
+      <span class="sp"></span>
+      <span class="pill" id="total">Tours: 0</span>
+      <a class="pill pill-lime" href="create.html">＋ Create a virtual tour</a>
+    </div>
+    <div class="status-bar" id="status"></div>
+    <div class="ttable">
+      <table>
+        <thead><tr id="thead"></tr></thead>
+        <tbody id="rows"><tr><td colspan="7"><div class="skeleton" style="min-height:120px"></div></td></tr></tbody>
+      </table>
+      <div class="tfoot" id="tfoot"></div>
+    </div>
+  </main>
+</div>
+
+<div class="modal" id="m-rename"><div class="dlg" style="width:min(420px,100%)">
+  <div class="dlg-head"><span>Rename tour</span><button class="x" data-close aria-label="Close">×</button></div>
+  <div class="dlg-body"><input class="inp" id="rename-in" maxlength="120" aria-label="Tour title"></div>
+  <div class="dlg-foot"><button class="b" data-close>Cancel</button><button class="b b-green" id="rename-save">Save</button></div>
+</div></div>
+
+<script src="js/vendor/qrcode.js"></script>
+<script type="module" src="js/dash.js"></script>
+</body></html>

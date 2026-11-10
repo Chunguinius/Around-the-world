@@ -38,7 +38,7 @@ export class PanoViewer {
   on(evt, fn) { (this.listeners[evt] ||= []).push(fn); return this; }
   _emit(evt, d) { (this.listeners[evt] || []).forEach(f => f(d)); }
 
-  load(src, { yaw, pitch, hotspots = [] } = {}) {
+  load(src, { yaw, pitch, fov, hotspots = [] } = {}) {
     const token = this._loadToken = Symbol();
     return new Promise((resolve, reject) => {
       this.el.classList.add('pv-loading');
@@ -51,7 +51,7 @@ export class PanoViewer {
         if (old) old.dispose();
         if (yaw !== undefined) this.lon = yaw;
         if (pitch !== undefined) this.lat = pitch;
-        this.fov = this.opts.fov; this._tween = null;
+        this.fov = clamp(fov || this.opts.fov, this.opts.minFov, this.opts.maxFov); this._tween = null;
         this.setHotspots(hotspots);
         this.mat.opacity = 0; this._fade = performance.now();
         this.el.classList.remove('pv-loading');

@@ -1,81 +1,52 @@
 <!doctype html>
 <html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g'%3E%3Cstop stop-color='%234fd1c5'/%3E%3Cstop offset='1' stop-color='%237c6cff'/%3E%3C/linearGradient%3E%3C/defs%3E%3Ccircle cx='16' cy='16' r='16' fill='url(%23g)'/%3E%3C/svg%3E">
-<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23e1ff15'/%3E%3Cg fill='none' stroke='%2316181d' stroke-width='2.2'%3E%3Ccircle cx='16' cy='16' r='8'/%3E%3Cpath d='M8 16h16M16 8c3 3 3 13 0 16M16 8c-3 3-3 13 0 16'/%3E%3C/g%3E%3C/svg%3E">
 <link rel="stylesheet" href="css/style.css">
 <title>Create a tour · Around the World</title>
 </head>
-<body data-page="create">
-<div class="create-layout">
-  <aside class="panel">
-    <h3>Tour</h3>
-    <label class="field">Title<input id="title" placeholder="My first tour" maxlength="120"></label>
-    <label class="field">Location<input id="location" placeholder="City, venue or address" maxlength="120"></label>
-    <label class="field">Description<textarea id="desc" rows="2" maxlength="600" placeholder="What will visitors see?"></textarea></label>
-    <div class="row">
-      <label class="field">Category<select id="category"><option>Real estate</option><option>Architecture</option><option>Hospitality</option><option>Travel</option><option>Nature</option><option>Events</option><option>Education</option><option selected>Other</option></select></label>
-      <label class="field">Who can see it<select id="visibility"><option value="public">Everyone (Explore)</option><option value="unlisted">Only with the link</option></select></label>
+<body data-page="create" data-side="create" data-nofooter="1">
+<div class="app">
+  <aside class="side" id="side"></aside>
+  <main class="main">
+    <div class="page-head">
+      <span class="tile">＋</span>
+      <div><h1>Create a virtual tour</h1><p><b style="color:var(--green-d)" id="count">0/200</b>&nbsp; Add up to 200 panoramas to one tour.</p></div>
     </div>
-    <h3>Scenes <span class="small" id="scene-count"></span></h3>
-    <div class="scene-list" id="scenes"></div>
-    <label class="btn" style="width:100%;justify-content:center">＋ Add panoramas<input type="file" id="file2" accept="image/jpeg,image/png,image/webp" multiple hidden></label>
-    <button class="btn btn-ghost" id="auto-link" style="width:100%;justify-content:center;margin-top:8px" hidden title="Adds a checkpoint from each scene to the next one, and a way back">⇄ Connect scenes in order</button>
-    <p class="small" style="margin-top:12px">Use 2:1 equirectangular images (JPG, PNG or WebP), such as 360° renders or camera exports. The first scene is where the tour starts.</p>
-  </aside>
+    <div class="status-bar"><span style="color:#c98a00">♛</span> Plan: <span class="tag-dark">Free</span> Publishing, share links and QR codes are included.</div>
 
-  <div class="stage" id="stage">
-    <div class="mode-bar" id="tools" hidden>
-      <button id="t-link" class="primary" title="Add a checkpoint that moves visitors to another scene">＋ Checkpoint</button>
-      <button id="t-info" title="Add a note visitors can open">ⓘ Info point</button>
-      <button id="t-start" title="Visitors will first see this scene from the current angle">◎ Set start view</button>
-      <button id="t-preview" title="Open the tour as visitors will see it">▶ Preview</button>
-    </div>
-    <div class="picker" id="picker" hidden>
-      <div class="picker-head"><b>Where does this checkpoint lead?</b><button class="x" id="picker-x" aria-label="Close">×</button></div>
-      <div class="picker-grid" id="picker-grid"></div>
-      <label class="check"><input type="checkbox" id="way-back" checked> Also add the way back</label>
-    </div>
-    <div class="stage-tip" id="tip" hidden></div>
-    <div class="dropzone" id="drop">
-      <div>
-        <div style="font-size:3rem">🌐</div>
-        <h2>Drop your 360° panoramas here</h2>
-        <p>Add every room or viewpoint at once. You can connect them in the next step.</p>
-        <div class="cta-row" style="justify-content:center">
-          <label class="btn btn-primary">Choose files<input type="file" id="file" accept="image/jpeg,image/png,image/webp" multiple hidden></label>
-          <button class="btn" id="sample">Try with sample images</button>
-        </div>
+    <div class="panel-card">
+      <h3>Tour settings</h3>
+      <div class="pad">
+        <label class="frow"><span>Title<i>*</i></span><input id="title" maxlength="120" placeholder="Enter the title of your tour" style="max-width:420px"></label>
+        <div class="frow"><span>Visibility</span><div style="padding-top:7px"><label class="ck"><input type="checkbox" id="public" checked> Show on the Explore page</label><p class="small" style="margin:6px 0 0">Unticked, only people with the link can open it. You can change this later in <a href="tours.html" style="color:var(--green-d);font-weight:600">My Tours</a>.</p></div></div>
+        <label class="frow" style="margin:0"><span>Category</span><select id="category" style="max-width:220px"><option>Real estate</option><option>Architecture</option><option>Hospitality</option><option>Travel</option><option>Nature</option><option>Events</option><option>Education</option><option selected>Other</option></select></label>
       </div>
     </div>
-  </div>
 
-  <aside class="panel right">
-    <ol class="steps-mini" id="guide"></ol>
-    <h3>In this scene</h3>
-    <div id="hs-list"></div>
-    <h3 style="margin-top:24px">Floor plan <span class="small">(optional)</span></h3>
-    <div id="plan-box"></div>
-    <div style="display:grid;gap:10px;margin-top:24px">
-      <button class="btn btn-primary" id="publish" style="justify-content:center">Publish tour</button>
-      <button class="btn" id="save" style="justify-content:center">Save draft</button>
+    <div class="panel-card">
+      <div class="upload-box" id="drop">
+        <b>Drop your panoramas here, or pick them below.</b>
+        <div class="pick-row">
+          <label class="pick">Upload 2:1 panoramas<input type="file" id="file" accept="image/jpeg,image/png,image/webp" multiple hidden></label>
+          <button class="pick" id="sample">Try the sample panoramas</button>
+        </div>
+        <button class="btn" id="go">✦ Create</button>
+        <p class="small" id="progress" style="margin:14px 0 0"></p>
+        <div class="thumbs" id="thumbs"></div>
+      </div>
     </div>
-    <p class="small" id="status" style="margin-top:12px"></p>
-  </aside>
+
+    <div class="panel-card">
+      <h3>Upload tips</h3>
+      <div class="pad"><ul class="tips">
+        <li>Use equirectangular images with a 2:1 aspect ratio, such as 360° camera exports or renders from your 3D software.</li>
+        <li>JPG, PNG and WebP files work. Very large images are scaled down to 8K wide.</li>
+        <li>Name your files after the rooms. The file name becomes the scene name.</li>
+        <li>The first panorama is where the tour starts. You can reorder scenes in the editor.</li>
+      </ul></div>
+    </div>
+  </main>
 </div>
-
-<section class="block container" id="my-tours" style="padding:80px 0">
-  <div class="section-head" style="text-align:left;margin:0 0 32px"><span class="eyebrow">Library</span><h2>My tours</h2></div>
-  <div class="grid" id="mine"></div>
-</section>
-
-<div class="modal" id="done-modal"><div class="modal-box">
-  <button class="modal-close" data-close>×</button>
-  <h3>Your tour is live 🎉</h3>
-  <p>Anyone with this link can explore it.</p>
-  <label class="field">Link<div class="row"><input id="done-link" readonly><button class="btn btn-sm" id="done-copy">Copy</button></div></label>
-  <a class="btn btn-primary" id="done-open" style="width:100%;justify-content:center">Open the tour</a>
-</div></div>
-
-<script type="module" src="js/editor.js"></script>
+<script type="module" src="js/create.js"></script>
 </body></html>

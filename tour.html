@@ -1,100 +1,119 @@
 <!doctype html>
 <html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g'%3E%3Cstop stop-color='%234fd1c5'/%3E%3Cstop offset='1' stop-color='%237c6cff'/%3E%3C/linearGradient%3E%3C/defs%3E%3Ccircle cx='16' cy='16' r='16' fill='url(%23g)'/%3E%3C/svg%3E">
-<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23e1ff15'/%3E%3Cg fill='none' stroke='%2316181d' stroke-width='2.2'%3E%3Ccircle cx='16' cy='16' r='8'/%3E%3Cpath d='M8 16h16M16 8c3 3 3 13 0 16M16 8c-3 3-3 13 0 16'/%3E%3C/g%3E%3C/svg%3E">
 <link rel="stylesheet" href="css/style.css">
 <title>Tour · Around the World</title>
 </head>
 <body class="tour-page">
 <div class="tour-shell">
   <div id="viewer"></div>
-  <div class="tour-top">
-    <a class="icon-btn" href="explore.html" id="back" title="Back" aria-label="Back"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></a>
-    <div class="tour-title"><h1 id="t-title">Loading…</h1><span id="t-sub"></span></div>
-    <a class="logo" href="index.html" id="brand" target="_blank" rel="noopener" style="margin-left:auto;font-size:1rem"><span class="logo-mark" style="width:24px;height:24px"></span>Around the World</a>
+  <div class="tl">
+    <span class="views" id="views"></span>
+    <span id="brand"></span>
+    <div><h1 id="t-title">Loading…</h1><span class="sub" id="t-sub"></span></div>
+    <a class="tagbtn" id="back" hidden></a>
   </div>
-  <div class="tour-controls">
-    <button class="icon-btn on" id="b-rotate" title="Auto-rotate" aria-label="Auto-rotate"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.6-5.9"/><path d="M20 4v5h-5"/></svg></button>
-    <button class="icon-btn" id="b-in" title="Zoom in (+)" aria-label="Zoom in"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3M11 8v6M8 11h6"/></svg></button>
-    <button class="icon-btn" id="b-out" title="Zoom out (-)" aria-label="Zoom out"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3M8 11h6"/></svg></button>
-    <button class="icon-btn" id="b-map" title="Floor plan (M)" aria-label="Floor plan" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2-6-2z"/><path d="M9 4v14M15 6v14"/></svg></button>
-    <button class="icon-btn" id="b-gyro" title="Use device motion" aria-label="Use device motion"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="3" width="10" height="18" rx="2"/><path d="M11 18h2"/></svg></button>
-    <button class="icon-btn" id="b-full" title="Fullscreen (F)" aria-label="Fullscreen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
-    <button class="icon-btn" id="b-share" title="Share" aria-label="Share"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8.2 10.9l7.6-3.8M8.2 13.1l7.6 3.8"/></svg></button>
-    <button class="icon-btn" id="b-help" title="Controls (?)" aria-label="Controls"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.6 2.2c-.7.4-1.1 1-1.1 1.8M12 17h.01"/></svg></button>
+  <div class="tr" id="controls">
+    <button class="ic" id="b-full" title="Fullscreen (F)" aria-label="Fullscreen"><svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
+    <button class="ic on" id="b-rotate" title="Auto-rotate" aria-label="Auto-rotate"><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.6-5.9"/><path d="M20 4v5h-5"/></svg></button>
+    <button class="ic" id="b-map" title="Floor plan (M)" aria-label="Floor plan" hidden><svg viewBox="0 0 24 24"><path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2-6-2z"/><path d="M9 4v14M15 6v14"/></svg></button>
+    <button class="ic" id="b-gyro" title="Use device motion" aria-label="Use device motion"><svg viewBox="0 0 24 24"><rect x="7" y="3" width="10" height="18" rx="2"/><path d="M11 18h2"/></svg></button>
+    <button class="ic" id="b-help" title="Controls (?)" aria-label="Controls"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.6 2.2c-.7.4-1.1 1-1.1 1.8M12 17h.01"/></svg></button>
   </div>
   <div class="scene-name" id="scene-name"></div>
-  <div class="help-pop" id="help" hidden>
+  <div class="pop help-pop" id="help" hidden>
     <h3>How to move</h3>
     <dl>
       <dt><span class="kbd">Drag</span></dt><dd>Look around</dd>
       <dt><span class="kbd">A</span> <span class="kbd">D</span></dt><dd>Turn left and right</dd>
-      <dt><span class="kbd">W</span></dt><dd>Walk to the highlighted checkpoint</dd>
+      <dt><span class="kbd">W</span></dt><dd>Walk to the highlighted arrow</dd>
       <dt><span class="kbd">S</span></dt><dd>Go back the way you came</dd>
       <dt><span class="kbd">Scroll</span></dt><dd>Zoom in and out</dd>
       <dt><span class="kbd">F</span> <span class="kbd">M</span></dt><dd>Fullscreen and floor plan</dd>
     </dl>
   </div>
-  <div class="walk-pad" id="pad" aria-label="Movement controls">
-    <button data-k="w" class="k-w" title="Walk forward (W)">W</button>
-    <button data-k="a" class="k-a" title="Turn left (A)">A</button>
-    <button data-k="s" class="k-s" title="Go back (S)">S</button>
-    <button data-k="d" class="k-d" title="Turn right (D)">D</button>
-    <span class="walk-hint" id="walk-hint"></span>
-  </div>
   <div class="minimap" id="minimap" hidden><img id="map-img" alt="Floor plan"><div id="map-pins"></div></div>
-  <div class="info-pop" id="info"><button class="modal-close" style="top:6px;right:10px" id="info-x">×</button><h3 id="i-title"></h3><p id="i-text" style="margin:0"></p></div>
-  <div class="scene-strip" id="strip"></div>
+  <div class="pop info-pop" id="info"><button class="x" id="info-x" aria-label="Close">×</button><h3 id="i-title"></h3><p id="i-text"></p></div>
+  <div class="strip-band" id="band"><div class="strip" id="strip"></div></div>
+  <div class="corner l">
+    <button class="cbtn" id="b-scenes" title="Show or hide the scene list"><i><svg viewBox="0 0 24 24"><rect x="4" y="4" width="6.5" height="6.5" rx="1"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1"/><path d="M17 3.5l3.5 3.5-3.5 3.5-3.5-3.5z"/></svg></i>Scene</button>
+    <div class="walk-pad" id="pad" aria-label="Movement controls">
+      <button data-k="w" class="k-w" title="Walk forward (W)">W</button>
+      <button data-k="a" class="k-a" title="Turn left (A)">A</button>
+      <button data-k="s" class="k-s" title="Go back (S)">S</button>
+      <button data-k="d" class="k-d" title="Turn right (D)">D</button>
+      <span class="walk-hint" id="walk-hint"></span>
+    </div>
+  </div>
+  <div class="corner r">
+    <button class="cbtn" id="b-share" title="Share this tour"><i><svg viewBox="0 0 24 24"><path d="M11 5H5v14h14v-6"/><path d="M14 4h6v6M20 4l-8 8"/></svg></i>Share</button>
+  </div>
+  <div class="notfound" id="notfound" hidden><div><h2>Tour not found</h2><p>The link may be wrong, or the tour was removed.</p><a class="b b-green" href="explore.html">Explore other tours</a></div></div>
 </div>
 
-<div class="modal" id="share-modal"><div class="modal-box share-box">
-  <button class="modal-close" id="share-x">×</button>
-  <h3>Share this tour</h3>
-  <div id="qr"></div>
-  <label class="field">Link<div class="row"><input id="s-link" readonly><button class="btn btn-sm" data-copy="s-link">Copy</button></div></label>
-  <label class="field">Embed code<textarea id="s-embed" readonly></textarea></label>
-  <div class="row"><button class="btn btn-sm" data-copy="s-embed">Copy embed</button><a class="btn btn-sm" id="s-x" target="_blank" rel="noopener">Post on X</a><a class="btn btn-sm" id="s-fb" target="_blank" rel="noopener">Facebook</a></div>
-  <p class="small" id="s-note" style="margin-top:1em"></p>
+<div class="modal" id="share-modal"><div class="dlg">
+  <div class="dlg-head"><span>Share this tour</span><button class="x" data-close aria-label="Close">×</button></div>
+  <div class="dlg-body">
+    <div class="share-grid">
+      <div class="qr" id="qr"></div>
+      <div>
+        <label class="field">Link<div class="row"><input id="s-link" readonly><button class="b b-green" data-copy="s-link">Copy</button></div></label>
+        <label class="field">Embed code<textarea id="s-embed" readonly></textarea></label>
+        <div class="row" style="flex-wrap:wrap"><button class="b" data-copy="s-embed">Copy embed</button><a class="b" id="s-x" target="_blank" rel="noopener">Post on X</a><a class="b" id="s-fb" target="_blank" rel="noopener">Facebook</a></div>
+      </div>
+    </div>
+    <p class="small" id="s-note" style="margin:1em 0 0"></p>
+  </div>
 </div></div>
 
 <script src="js/vendor/qrcode.js"></script>
 <script type="module">
-  import { toast } from './js/layout.js';
+  import { toast, logoHTML } from './js/layout.js';
   import { PanoViewer, escapeHtml } from './js/viewer.js';
   import { loadTour, linkLabel } from './js/tours.js';
   import { bumpViews } from './js/cloud.js';
+  import { settingsOf, SPEEDS, qrSvg, copyText, embedCode } from './js/pano.js';
 
   const $ = id => document.getElementById(id);
   const params = new URLSearchParams(location.search);
   const embed = params.has('embed');
+  $('brand').innerHTML = logoHTML('index.html', embed ? 'target="_blank" rel="noopener"' : '');
   const tour = await loadTour(params).catch(e => { console.error(e); return null; });
   if (!tour || !tour.scenes.length) {
-    $('t-title').textContent = 'Tour not found'; $('t-sub').textContent = 'The link may be wrong, or the tour was removed.';
-    for (const id of ['pad', 'strip']) $(id).hidden = true; document.querySelector('.tour-controls').hidden = true;
+    $('t-title').textContent = '';
+    for (const id of ['band', 'controls']) $(id).hidden = true;
+    document.querySelectorAll('.corner').forEach(c => c.hidden = true);
+    $('notfound').hidden = false;
     await new Promise(() => {});   // nothing more to set up on this page
   }
-  $('back').hidden = embed; $('brand').hidden = !embed;
-  if (tour.kind === 'draft') { $('back').href = 'create.html?edit=' + tour.id; $('back').title = 'Back to the editor'; }
+  const set = settingsOf(tour);
+  if (tour.kind === 'draft' && !embed) { const b = $('back'); b.hidden = false; b.href = 'edit.html?id=' + tour.id; b.textContent = 'Back to the editor'; }
   document.title = tour.title + ' · Around the World';
   $('t-title').textContent = tour.title;
   $('t-sub').textContent = [tour.location, tour.author && 'by ' + tour.author].filter(Boolean).join(' · ');
-  if (tour.kind === 'cloud' && !sessionStorage.getItem('seen-' + tour.id)) { sessionStorage.setItem('seen-' + tour.id, 1); bumpViews(tour.id); }
+  if (tour.kind === 'cloud' && !sessionStorage.getItem('seen-' + tour.id)) { sessionStorage.setItem('seen-' + tour.id, 1); bumpViews(tour.id); tour.views = (tour.views || 0) + 1; }
+  if (set.views && tour.kind !== 'draft') $('views').textContent = (tour.views || 0).toLocaleString() + ' views';
+  $('b-full').hidden = !set.fullscreen; $('b-share').hidden = !set.share; $('pad').hidden = !set.pad;
 
-  const viewer = new PanoViewer($('viewer'), { autoRotate: 0.04, keyboard: 'global' });
+  const speed = (SPEEDS[set.speed] || SPEEDS.medium) * (set.dir < 0 ? -1 : 1);
+  const viewer = new PanoViewer($('viewer'), { autoRotate: set.rotate ? speed : 0, keyboard: 'global' });
   const byId = id => tour.scenes.find(s => s.id === id);
   const trail = [];           // scenes walked through, for S (go back)
   let current = null, busy = false;
 
-  const strip = $('strip');
-  strip.hidden = tour.scenes.length < 2;
-  strip.innerHTML = tour.scenes.map(s => `<button data-s="${escapeHtml(s.id)}"><img src="${escapeHtml(s.thumbUrl)}" alt=""><span>${escapeHtml(s.title)}</span></button>`).join('');
+  const strip = $('strip'), band = $('band');
+  const many = tour.scenes.length > 1;
+  $('b-scenes').hidden = !many; band.hidden = !many;
+  if (!set.strip || innerHeight < 430) band.classList.add('shut');
+  strip.innerHTML = tour.scenes.map(s => `<button data-s="${escapeHtml(s.id)}"><img src="${escapeHtml(s.thumbUrl)}" alt="" loading="lazy"><span>${escapeHtml(s.title)}</span><em>${escapeHtml(s.title)}</em></button>`).join('');
   strip.onclick = e => { const b = e.target.closest('[data-s]'); if (b && b.dataset.s !== current.id) go(b.dataset.s); };
+  $('b-scenes').onclick = () => band.classList.toggle('shut');
 
   // Arrive facing the way you were walking: away from the link that leads back to where you came from.
   function arrivalView(scene, fromId) {
     const back = fromId && scene.hotspots.find(h => h.type === 'scene' && h.target === fromId);
-    return back ? { yaw: back.yaw + 180, pitch: 0 } : { yaw: scene.yaw || 0, pitch: scene.pitch || 0 };
+    return back ? { yaw: back.yaw + 180, pitch: 0, fov: scene.fov } : { yaw: scene.yaw || 0, pitch: scene.pitch || 0, fov: scene.fov };
   }
   async function go(id, { from = null, record = true } = {}) {
     const s = byId(id) || tour.scenes[0];
@@ -105,10 +124,11 @@
     renderPins(); showSceneName(s.title);
     const u = new URL(location); u.searchParams.set('scene', s.id); history.replaceState(null, '', u);
     const hotspots = s.hotspots.filter(h => h.type !== 'scene' || byId(h.target)).map(h => ({ ...h, label: linkLabel(h, tour.scenes) }));
+    turned = 0;
     try { await viewer.load(s.src, { ...arrivalView(s, from), hotspots }); } catch { toast('This panorama could not be loaded'); }
   }
   let nameTimer;
-  function showSceneName(t) { if (tour.scenes.length < 2) return; const el = $('scene-name'); el.textContent = t; el.classList.add('show'); clearTimeout(nameTimer); nameTimer = setTimeout(() => el.classList.remove('show'), 2200); }
+  function showSceneName(t) { if (!many) return; const el = $('scene-name'); el.textContent = t; el.classList.add('show'); clearTimeout(nameTimer); nameTimer = setTimeout(() => el.classList.remove('show'), 2200); }
   // walk through a scene link: turn toward it, lean in, then switch scenes
   async function travel(link, opts) {
     if (busy) return; busy = true;
@@ -143,52 +163,61 @@
   addEventListener('keyup', e => pad.querySelector('[data-k="' + (e.key || '').toLowerCase() + '"]')?.classList.remove('down'));
 
   // floor plan
-  const fp = tour.floorplan && tour.floorplan.src && Object.keys(tour.floorplan.markers || {}).length ? tour.floorplan : null;
+  const fp = set.plan && tour.floorplan && tour.floorplan.src && Object.keys(tour.floorplan.markers || {}).length ? tour.floorplan : null;
   if (fp) { $('b-map').hidden = false; $('map-img').src = fp.src; $('minimap').hidden = innerWidth < 700; $('b-map').classList.toggle('on', !$('minimap').hidden); }
   function renderPins() {
     if (!fp) return;
     $('map-pins').innerHTML = tour.scenes.map((s, i) => { const m = fp.markers[s.id]; return m ? `<button class="pin ${s.id === current.id ? 'on' : ''}" style="left:${m.x * 100}%;top:${m.y * 100}%" data-s="${escapeHtml(s.id)}" title="${escapeHtml(s.title)}">${i + 1}</button>` : ''; }).join('');
   }
   $('map-pins').onclick = e => { const b = e.target.closest('[data-s]'); if (b && b.dataset.s !== current.id) go(b.dataset.s); };
-  $('b-map').onclick = () => { const m = $('minimap'); m.hidden = !m.hidden; $('b-map').classList.toggle('on', !m.hidden); };
+  $('b-map').onclick = () => { const m = $('minimap'); m.hidden = !m.hidden; $('b-map').classList.toggle('on', !m.hidden); if (!m.hidden) closeHelp(); };
 
+  let turned = 0;
   await go(params.get('scene') || tour.scenes[0].id, { record: false });
 
-  const rot = $('b-rotate');
-  rot.onclick = () => { const on = !rot.classList.contains('on'); rot.classList.toggle('on', on); viewer.setAutoRotate(on ? 0.04 : 0); };
-  $('b-in').onclick = () => viewer.zoom(-10);
-  $('b-out').onclick = () => viewer.zoom(10);
-  $('b-gyro').onclick = () => {
-    if (!('DeviceOrientationEvent' in window) || !matchMedia('(pointer:coarse)').matches) return toast('Device motion works on phones and tablets');
-    viewer.enableGyro().then(ok => toast(ok ? 'Tilt your device to look around' : 'Motion access denied'));
-  };
+  // optional: after one full turn of auto-rotation, move on to the next scene
+  if (set.rotate && set.next && many) {
+    let last = viewer.lon;
+    setInterval(() => {
+      const moving = viewer.opts.autoRotate && !busy && !document.hidden; const d = Math.abs(viewer.lon - last); last = viewer.lon;
+      if (!moving || d > 5) return; turned += d;
+      if (turned >= 360) { turned = 0; const i = tour.scenes.indexOf(current); go(tour.scenes[(i + 1) % tour.scenes.length].id); }
+    }, 250);
+  }
+
+  const rot = $('b-rotate'); rot.classList.toggle('on', !!set.rotate);
+  rot.onclick = () => { const on = !rot.classList.contains('on'); rot.classList.toggle('on', on); viewer.setAutoRotate(on ? (speed || SPEEDS.medium) : 0); };
+  $('b-gyro').hidden = !matchMedia('(pointer:coarse)').matches;
+  $('b-gyro').onclick = () => viewer.enableGyro().then(ok => toast(ok ? 'Tilt your device to look around' : 'Motion access denied'));
   $('b-full').onclick = () => document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen?.();
+  const closeHelp = () => { $('help').hidden = true; $('b-help').classList.remove('on'); };
   addEventListener('keydown', e => {
     if (e.target.closest('input,textarea') || e.ctrlKey || e.metaKey) return;
-    if (e.code === 'KeyF') $('b-full').click();
+    if (e.code === 'KeyF' && set.fullscreen) $('b-full').click();
     if (e.code === 'KeyM' && fp) $('b-map').click();
     if (e.key === '?') $('b-help').click();
-    if (e.key === 'Escape') { $('help').hidden = true; $('b-help').classList.remove('on'); $('info').classList.remove('open'); }
+    if (e.key === '+' || e.key === '=') viewer.zoom(-8);
+    if (e.key === '-') viewer.zoom(8);
+    if (e.key === 'Escape') { closeHelp(); $('info').classList.remove('open'); }
   });
-  $('b-help').onclick = () => { const h = $('help'); h.hidden = !h.hidden; $('b-help').classList.toggle('on', !h.hidden); };
+  $('b-help').onclick = () => { const h = $('help'); h.hidden = !h.hidden; $('b-help').classList.toggle('on', !h.hidden); if (!h.hidden && fp) { $('minimap').hidden = true; $('b-map').classList.remove('on'); } };
   $('info-x').onclick = () => $('info').classList.remove('open');
-  $('share-x').onclick = () => $('share-modal').classList.remove('open');
 
   $('b-share').onclick = () => {
-    const u = new URL(location); u.searchParams.delete('embed');
-    const link = u.href, em = new URL(u); em.searchParams.set('embed', '1');
-    $('s-link').value = link;
-    $('s-embed').value = `<iframe src="${em.href}" width="100%" height="480" style="border:0;border-radius:12px" allow="fullscreen; gyroscope; accelerometer" allowfullscreen loading="lazy"></iframe>`;
+    const u = new URL(location); u.searchParams.delete('embed'); u.searchParams.delete('scene');
+    const link = u.href;
+    $('s-link').value = link; $('s-embed').value = embedCode(link);
     $('s-x').href = 'https://twitter.com/intent/tweet?url=' + encodeURIComponent(link) + '&text=' + encodeURIComponent(tour.title + ' in 360°');
     $('s-fb').href = 'https://www.facebook.com/sharer/sharer.php?u=' + encodeURIComponent(link);
     $('s-note').textContent = tour.kind === 'draft' ? 'This is a draft saved in this browser, so the link only works on this device. Publish it from the editor to share it with anyone.' : '';
-    if (window.qrcode) { const q = qrcode(0, 'M'); q.addData(link); q.make(); $('qr').innerHTML = q.createSvgTag(4, 0); }
+    $('qr').innerHTML = qrSvg(link, 4);
     $('share-modal').classList.add('open');
   };
-  document.querySelectorAll('[data-copy]').forEach(b => b.onclick = e => {
+  document.querySelectorAll('[data-copy]').forEach(b => b.onclick = async e => {
     e.preventDefault(); const el = $(b.dataset.copy);
-    navigator.clipboard?.writeText(el.value).then(() => toast('Copied'), () => { el.select(); document.execCommand('copy'); toast('Copied'); });
+    if (!await copyText(el.value)) { el.select(); document.execCommand('copy'); }
+    toast('Copied');
   });
-  if (!embed && !localStorage.getItem('atw-wasd-tip') && matchMedia('(pointer:fine)').matches) { localStorage.setItem('atw-wasd-tip', 1); setTimeout(() => { $('b-help').click(); setTimeout(() => { $('help').hidden = true; $('b-help').classList.remove('on'); }, 8000); }, 900); }
+  if (!embed && !localStorage.getItem('atw-wasd-tip') && matchMedia('(pointer:fine)').matches && !fp) { localStorage.setItem('atw-wasd-tip', 1); setTimeout(() => { $('b-help').click(); setTimeout(closeHelp, 8000); }, 900); }
 </script>
 </body></html>

@@ -1,54 +1,88 @@
-// Tour editor: upload panoramas, connect them with checkpoints, add a floor plan, publish.
-import { toast, whoami, openAuth, takeAfterLogin } from './layout.js';
+// Tour editor: a full-screen panorama with the tool menu on the right and the scene strip along the bottom.
+import { toast, whoami, openAuth, takeAfterLogin, logoHTML } from './layout.js';
 import { PanoViewer, escapeHtml, yawDiff } from './viewer.js';
-import { saveDraft, getDraft, deleteDraft } from './db.js';
-import { cloudEnabled, uploadFile, saveNewTour, updateTour, getTourRow, deleteTour, pruneFiles } from './cloud.js';
-import { sceneSrc, sceneThumb, planSrc, linkLabel, myCards, tourHref } from './tours.js';
+import { saveDraft, getDraft } from './db.js';
+import { cloudEnabled, uploadFile, saveNewTour, updateTour, getTourRow, pruneFiles } from './cloud.js';
+import { sceneSrc, sceneThumb, planSrc, linkLabel } from './tours.js';
+import { processPano, processPlan, isImage, settingsOf, qrSvg, copyText, downloadSvg, tourLink, embedCode } from './pano.js';
 
 const $ = id => document.getElementById(id);
-const uid = () => crypto.randomUUID();
 const user = await whoami;
+$('brand').innerHTML = logoHTML('index.html');
 
-let tour = { id: uid(), title: '', location: '', description: '', category: 'Other', visibility: 'public', scenes: [], floorplan: null, published: false };
-let cur = null, viewer = null, pendingSpot = null, dirty = false, saveTimer = null;
+// ---------- load the tour ----------
+const q = new URLSearchParams(location.search);
+const editId = q.get('id') || q.get('edit');
+let tour = editId ? await getDraft(editId).catch(() => null) : null;
+if (!tour && editId && cloudEnabled) {
+  const row = await getTourRow(editId).catch(() => null);
+  if (row && user && row.owner === user.id) {
+    const scenes = row.data?.scenes || [];
+    tour = { id: row.id, title: row.title, location: row.location, description: row.description, category: row.category, visibility: row.visibility, owner: row.owner, author: row.author,
+      published: true, scenes, floorplan: row.data?.floorplan || null, settings: row.data?.settings, cover: scenes.find(s => s.thumb === row.cover)?.id };
+  } else if (row) toast('You can only edit your own tours');
+}
+if (!tour || !tour.scenes?.length) { location.replace('create.html'); await new Promise(() => {}); }
+tour.scenes.forEach(s => s.hotspots ||= []);
+if (tour.floorplan) tour.floorplan.markers ||= {};
+
+let cur = null, dirty = false, saveTimer = null, panel = null, hsTab = 'scene', openRow = -1, pendingSpot = null, planSel = null;
 const scene = () => tour.scenes.find(s => s.id === cur);
 const byId = id => tour.scenes.find(s => s.id === id);
 const links = s => s.hotspots.filter(h => h.type === 'scene');
+const coverScene = () => byId(tour.cover) || tour.scenes[0];
 
-// ---------- persistence ----------
-function touch() { dirty = true; clearTimeout(saveTimer); saveTimer = setTimeout(saveNow, 700); renderGuide(); }
+// ---------- saving ----------
+function touch() { dirty = true; tour.pending = true; clearTimeout(saveTimer); saveTimer = setTimeout(saveNow, 700); renderStatus(); }
 async function saveNow(quiet = true) {
-  clearTimeout(saveTimer);
-  if (!tour.scenes.length) return false;
-  tour.updated = Date.now();
-  try {
-    await saveDraft(tour); dirty = false;
-    if (!new URLSearchParams(location.search).get('edit')) history.replaceState(null, '', 'create.html?edit=' + tour.id);
-    $('status').textContent = 'Draft saved in this browser at ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + (tour.published ? '. Publish again to update the live tour.' : '.');
-    if (!quiet) { toast('Draft saved'); renderMine(); }
-    return true;
-  } catch (e) { $('status').textContent = 'Could not save the draft: ' + e.message; return false; }
+  clearTimeout(saveTimer); tour.updated = Date.now();
+  try { await saveDraft(tour); dirty = false; renderStatus(); if (!quiet) toast('Saved in this browser'); return true; }
+  catch (e) { $('status').textContent = 'Could not save: ' + e.message; return false; }
+}
+function renderStatus() {
+  $('status').textContent = dirty ? 'Saving…' : !tour.published ? 'Draft saved in this browser' : tour.pending ? 'Changes not published yet' : 'Published';
+  $('publish').textContent = tour.published ? 'Publish changes' : 'Publish';
+}
+let tipTimer;
+function tip(text, ms = 4500) { clearTimeout(tipTimer); const t = $('tip'); t.textContent = text; t.hidden = !text; if (text && ms) tipTimer = setTimeout(() => t.hidden = true, ms); }
+
+// ---------- panorama ----------
+const viewer = new PanoViewer($('viewer'), { autoRotate: 0, editable: true, keyboard: 'global' });
+viewer.on('hotspotmove', touch);
+viewer.on('hotspot', h => { hsTab = h.type === 'scene' ? 'scene' : 'info'; openRow = scene().hotspots.indexOf(h); setPanel('hotspot'); });
+viewer.on('dblclick', p => { setPanel('hotspot'); hsTab = 'scene'; renderSpots(); openPicker({ yaw: p.yaw, pitch: p.pitch }); });
+viewer.on('walk', ({ dir, link }) => { if (dir > 0 && link) select(link.target); });
+// the viewer shows the stored hotspot objects directly (so dragging edits them); labels are filled in on the nodes
+function labelSpots() { viewer.hotspots.forEach(hs => { hs.node.querySelector('.pv-label').textContent = linkLabel(hs.data, tour.scenes); }); }
+function refreshSpots() { viewer.setHotspots(scene().hotspots); labelSpots(); renderSpots(); }
+function select(id) {
+  const s = byId(id); if (!s) return;
+  cur = id; openRow = -1; closePicker(); renderStrip(); renderSpots();
+  viewer.load(sceneSrc(s), { yaw: s.yaw, pitch: s.pitch, fov: s.fov, hotspots: s.hotspots }).then(() => { labelSpots(); syncFov(); }).catch(() => toast('This panorama could not be loaded'));
 }
 
-// ---------- images ----------
-function canvasBlob(c, type, q) { return new Promise(r => c.toBlob(r, type, q)); }
-async function processPano(file) {
-  const bmp = await createImageBitmap(file);
-  const ratio = bmp.width / bmp.height;
-  const gl = document.createElement('canvas').getContext('webgl');
-  const maxW = Math.min(gl ? gl.getParameter(gl.MAX_TEXTURE_SIZE) : 4096, 8192);
-  const w = Math.min(bmp.width, maxW), h = Math.round(w / 2);
-  const c = document.createElement('canvas'); c.width = w; c.height = h; c.getContext('2d').drawImage(bmp, 0, 0, w, h);
-  const blob = await canvasBlob(c, 'image/jpeg', 0.88);
-  const t = document.createElement('canvas'); t.width = 480; t.height = 270;
-  t.getContext('2d').drawImage(bmp, bmp.width * .25, bmp.height * .2, bmp.width * .5, bmp.height * .6, 0, 0, 480, 270);
-  const thumbBlob = await canvasBlob(t, 'image/jpeg', 0.8);
-  bmp.close?.();
-  const title = file.name.replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' ').trim().slice(0, 60) || 'Scene';
-  return { scene: { id: uid(), title, blob, thumbBlob, yaw: 0, pitch: 0, hotspots: [] }, stretched: Math.abs(ratio - 2) > 0.15 };
+// ---------- scene strip ----------
+function renderStrip() {
+  $('strip').innerHTML = tour.scenes.map(s => `<button data-s="${s.id}" draggable="true" class="${s.id === cur ? 'on' : ''}"><img src="${sceneThumb(s)}" alt="" draggable="false"><span>${escapeHtml(s.title)}</span><em>${escapeHtml(s.title)}</em></button>`).join('')
+    + '<button class="add" id="strip-add" title="Add panoramas" aria-label="Add panoramas">+</button>';
 }
+$('strip').addEventListener('click', e => {
+  if (e.target.closest('#strip-add')) return $('file').click();
+  const b = e.target.closest('[data-s]'); if (b && b.dataset.s !== cur) select(b.dataset.s);
+});
+$('strip').addEventListener('dragstart', e => { const b = e.target.closest('[data-s]'); if (!b) return; e.dataTransfer.setData('text/scene', b.dataset.s); e.dataTransfer.effectAllowed = 'link'; });
+$('b-scenes').onclick = () => $('band').classList.toggle('shut');
+const stage = $('stage');
+stage.addEventListener('dragover', e => e.preventDefault());
+stage.addEventListener('drop', e => {
+  e.preventDefault();
+  const id = e.dataTransfer.getData('text/scene');
+  if (id) { if (id === cur) return toast('Drop a different scene to link to it'); return placeLink(id, viewer.pick(e.clientX, e.clientY)); }
+  if (e.dataTransfer.files.length) addFiles(e.dataTransfer.files);
+});
+
 async function addFiles(files) {
-  const imgs = [...files].filter(f => /^image\/(jpeg|png|webp)$/.test(f.type));
+  const imgs = [...files].filter(isImage);
   if (!imgs.length) return toast('Please choose JPG, PNG or WebP images');
   if (tour.scenes.length + imgs.length > 200) return toast('A tour can hold up to 200 scenes');
   let odd = 0, failed = 0;
@@ -59,79 +93,44 @@ async function addFiles(files) {
   tip('');
   if (failed) toast(`${failed} file${failed > 1 ? 's' : ''} could not be read`);
   else if (odd) toast(`${odd} image${odd > 1 ? 's are' : ' is'} not 2:1, so ${odd > 1 ? 'they' : 'it'} may look stretched`);
-  if (!tour.scenes.length) return;
-  if (!tour.title) $('title').value = tour.title = tour.scenes[0].title;
-  showEditor(); select(cur || tour.scenes[0].id); touch();
-  if (tour.scenes.length > 1 && !tour.scenes.some(s => links(s).length)) tip('Next: look toward a doorway and press “＋ Checkpoint”, or drag a scene from the list onto the view.', 9000);
+  renderStrip(); renderSceneGrid(); renderSpots(); touch();
 }
+$('file').onchange = e => { addFiles(e.target.files); e.target.value = ''; };
 
-// ---------- viewer ----------
-function ensureViewer() {
-  if (viewer) return;
-  viewer = new PanoViewer($('stage'), { autoRotate: 0, editable: true, keyboard: 'global' });
-  viewer.on('hotspotmove', () => { renderSpots(); touch(); });
-  viewer.on('hotspot', h => focusSpot(scene().hotspots.indexOf(h)));
-  viewer.on('dblclick', p => openPicker({ yaw: p.yaw, pitch: p.pitch }));
-  viewer.on('walk', ({ dir, link }) => { if (dir > 0 && link) select(link.target); });
+// ---------- tool menu ----------
+const MODALS = ['info', 'scenes', 'plan', 'browse', 'share'];
+function markMenu() { $('menu').querySelectorAll('[data-m]').forEach(b => b.classList.toggle('on', b.dataset.m === panel || !!$('m-' + b.dataset.m)?.classList.contains('open'))); }
+function setPanel(p) {
+  panel = p; closePicker();
+  $('p-hotspot').hidden = p !== 'hotspot'; $('p-view').hidden = p !== 'view'; $('frame').hidden = p !== 'view'; stage.classList.toggle('viewing', p === 'view');
+  if (p === 'hotspot') renderSpots();
+  if (p === 'view') syncFov();
+  markMenu();
 }
-function showEditor() {
-  const has = tour.scenes.length > 0;
-  $('drop').hidden = has; $('tools').hidden = !has; $('auto-link').hidden = tour.scenes.length < 2;
-  if (has) ensureViewer();
-  renderScenes(); renderGuide(); renderPlan();
+function openModal(name) {
+  setPanel(null);
+  ({ info: fillInfo, scenes: renderSceneGrid, plan: () => { planSel = cur; renderPlan(); }, browse: fillBrowse, share: fillShare })[name]();
+  $('m-' + name).classList.add('open'); markMenu();
 }
-function refreshSpots() { const s = scene(); if (s) viewer.setHotspots(s.hotspots.map(h => Object.assign(h, { label: h.label || '' }))); labelSpots(); renderSpots(); }
-// viewer shows the stored hotspot objects directly (so dragging edits them); fill in display labels on the nodes
-function labelSpots() { viewer?.hotspots.forEach(hs => { hs.node.querySelector('.pv-label').textContent = linkLabel(hs.data, tour.scenes); }); }
-function select(id) {
-  const s = byId(id); if (!s) return;
-  cur = id; closePicker(); renderScenes(); renderPlan();
-  viewer.load(sceneSrc(s), { yaw: s.yaw, pitch: s.pitch, hotspots: s.hotspots }).then(labelSpots).catch(() => toast('This panorama could not be loaded'));
-  renderSpots();
-}
-
-// ---------- scenes list ----------
-function reachable() {
-  const seen = new Set(); const q = tour.scenes[0] ? [tour.scenes[0].id] : [];
-  while (q.length) { const id = q.pop(); if (seen.has(id)) continue; seen.add(id); links(byId(id) || { hotspots: [] }).forEach(h => byId(h.target) && q.push(h.target)); }
-  return seen;
-}
-function renderScenes() {
-  const ok = reachable();
-  $('scene-count').textContent = tour.scenes.length ? `(${tour.scenes.length})` : '';
-  $('scenes').innerHTML = tour.scenes.length ? tour.scenes.map((s, i) => `<div class="scene-item ${s.id === cur ? 'on' : ''}" data-id="${s.id}" draggable="true" title="Drag onto the panorama to add a checkpoint leading here">
-      <img src="${sceneThumb(s)}" alt="" draggable="false">
-      <div class="scene-main"><input value="${escapeHtml(s.title)}" data-rename="${s.id}" aria-label="Scene name" maxlength="60">
-        <span class="small">${i === 0 ? '<b class="tag">Start</b> ' : ''}${links(s).length} checkpoint${links(s).length === 1 ? '' : 's'}${!ok.has(s.id) ? ' · <span class="warn" title="No checkpoint leads here yet">⚠ unreachable</span>' : ''}</span></div>
-      <div class="scene-actions"><button data-up="${s.id}" title="Move up" ${i === 0 ? 'disabled' : ''}>↑</button><button data-down="${s.id}" title="Move down" ${i === tour.scenes.length - 1 ? 'disabled' : ''}>↓</button><button data-del="${s.id}" title="Remove scene">×</button></div></div>`).join('') : '<p class="empty">No scenes yet.</p>';
-}
-$('scenes').addEventListener('click', e => {
-  const del = e.target.closest('[data-del]'), up = e.target.closest('[data-up]'), down = e.target.closest('[data-down]');
-  if (del) {
-    const id = del.dataset.del; if (links(byId(id)).length && !confirm('Remove this scene and the checkpoints that lead to it?')) return;
-    tour.scenes = tour.scenes.filter(s => s.id !== id);
-    tour.scenes.forEach(s => s.hotspots = s.hotspots.filter(h => h.target !== id));
-    if (tour.floorplan) delete tour.floorplan.markers[id];
-    if (cur === id) cur = null;
-    showEditor(); if (tour.scenes[0]) select(cur || tour.scenes[0].id); else { viewer?.setHotspots([]); renderSpots(); }
-    return touch();
-  }
-  if (up || down) {
-    const i = tour.scenes.findIndex(s => s.id === (up || down).dataset[up ? 'up' : 'down']), j = i + (up ? -1 : 1);
-    [tour.scenes[i], tour.scenes[j]] = [tour.scenes[j], tour.scenes[i]]; renderScenes(); renderPlan(); return touch();
-  }
-  const it = e.target.closest('[data-id]'); if (it && !e.target.matches('input') && it.dataset.id !== cur) select(it.dataset.id);
+$('menu').addEventListener('click', async e => {
+  const m = e.target.closest('[data-m]')?.dataset.m; if (!m) return;
+  if (m === 'view' || m === 'hotspot') return setPanel(panel === m ? null : m);
+  if (MODALS.includes(m)) return openModal(m);
+  if (m === 'save') return saveNow(false);
+  if (m === 'preview') { if (await saveNow()) location.href = 'tour.html?local=' + tour.id; return; }
+  if (m === 'publish') publish();
 });
-$('scenes').addEventListener('input', e => { const s = byId(e.target.dataset.rename); if (s) { s.title = e.target.value; labelSpots(); renderSpots(); touch(); } });
-$('scenes').addEventListener('dragstart', e => { const it = e.target.closest('[data-id]'); if (!it) return; e.dataTransfer.setData('text/scene', it.dataset.id); e.dataTransfer.effectAllowed = 'link'; });
+// dialogs are closed by shared handlers (the × button, Cancel, Escape), so re-check the menu highlight afterwards
+['click', 'keyup'].forEach(t => document.addEventListener(t, () => setTimeout(markMenu)));
 
-// ---------- checkpoints and info points ----------
+// ---------- hotspots ----------
+const CHEV = '<svg viewBox="0 0 24 24"><path d="M5 8l7 6 7-6M5 14l7 6 7-6" opacity=".95"/></svg>', INFO = '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5h.01"/></svg>';
 function viewSpot() { const v = viewer.getView(); return { yaw: v.yaw, pitch: Math.max(-45, Math.min(v.pitch, 0) - 8) }; }
 function addLink(from, targetId, spot, wayBack) {
   from.hotspots.push({ type: 'scene', target: targetId, yaw: spot.yaw, pitch: spot.pitch, label: '' });
   const target = byId(targetId);
   if (wayBack && target && !links(target).some(h => h.target === from.id)) {
-    // put the return checkpoint behind the target scene's starting view, nudged aside if something is already there
+    // put the return hotspot behind the target scene's opening view, nudged aside if something is already there
     let yaw = (target.yaw || 0) + 180;
     while (links(target).some(h => Math.abs(yawDiff(h.yaw, yaw)) < 18)) yaw += 30;
     target.hotspots.push({ type: 'scene', target: from.id, yaw: ((yaw + 540) % 360) - 180, pitch: -8, label: '' });
@@ -147,26 +146,15 @@ function openPicker(spot = null) {
 }
 function closePicker() { $('picker').hidden = true; pendingSpot = null; }
 $('picker-x').onclick = closePicker;
-$('picker-grid').onclick = e => {
-  const b = e.target.closest('[data-t]'); if (!b) return;
-  placeLink(b.dataset.t, pendingSpot || viewSpot()); closePicker();
-};
+$('picker-grid').onclick = e => { const b = e.target.closest('[data-t]'); if (!b) return; const spot = pendingSpot || viewSpot(); closePicker(); placeLink(b.dataset.t, spot); };
 function placeLink(targetId, spot) {
   const back = addLink(scene(), targetId, spot, $('way-back').checked);
-  refreshSpots(); renderScenes(); touch();
-  focusSpot(scene().hotspots.length - 1, false);
-  tip(`Checkpoint to “${byId(targetId).title}” added. Drag it onto the doorway or path.` + (back ? ' A way back was added in that scene too.' : ''), 6000);
+  hsTab = 'scene'; openRow = scene().hotspots.length - 1;
+  if (panel !== 'hotspot') setPanel('hotspot');
+  refreshSpots(); renderSceneGrid(); touch();
+  tip(`Hotspot to “${byId(targetId).title}” added. Drag it onto the doorway or path.` + (back ? ' The way back was added in that scene too.' : ''), 6000);
 }
-$('t-link').onclick = () => $('picker').hidden ? openPicker() : closePicker();
-$('t-info').onclick = () => {
-  const v = viewer.getView();
-  scene().hotspots.push({ type: 'info', yaw: v.yaw, pitch: v.pitch, label: 'Info', text: '' });
-  refreshSpots(); touch(); focusSpot(scene().hotspots.length - 1, true);
-  tip('Info point added. Drag it into place and write its text on the right.', 5000);
-};
-$('t-start').onclick = () => { const v = viewer.getView(); Object.assign(scene(), { yaw: v.yaw, pitch: v.pitch }); touch(); tip('Start view saved: visitors will first see this scene from here.', 3500); };
-$('t-preview').onclick = async () => { if (await saveNow()) location.href = 'tour.html?local=' + tour.id; };
-$('auto-link').onclick = () => {
+function autoLink() {
   let n = 0;
   for (let i = 0; i < tour.scenes.length - 1; i++) {
     const a = tour.scenes[i], b = tour.scenes[i + 1];
@@ -174,109 +162,198 @@ $('auto-link').onclick = () => {
     let yaw = a.yaw || 0; while (links(a).some(h => Math.abs(yawDiff(h.yaw, yaw)) < 18)) yaw += 30;
     addLink(a, b.id, { yaw: ((yaw + 540) % 360) - 180, pitch: -8 }, true); n++;
   }
-  refreshSpots(); renderScenes(); touch();
-  tip(n ? `Connected ${n + 1} scenes in order. Open each scene and drag its checkpoints onto the real doorways.` : 'These scenes are already connected in order.', 7000);
-};
-// drop a scene from the list onto the panorama
-const stage = $('stage');
-stage.addEventListener('dragover', e => { e.preventDefault(); if (!tour.scenes.length) $('drop').classList.add('over'); });
-stage.addEventListener('dragleave', () => $('drop').classList.remove('over'));
-stage.addEventListener('drop', e => {
-  e.preventDefault(); $('drop').classList.remove('over');
-  const id = e.dataTransfer.getData('text/scene');
-  if (id) { if (id === cur) return toast('Drop a different scene to link to it'); return placeLink(id, viewer.pick(e.clientX, e.clientY)); }
-  if (e.dataTransfer.files.length) addFiles(e.dataTransfer.files);
-});
-
+  refreshSpots(); renderSceneGrid(); if (n) touch();
+  tip(n ? `Connected ${tour.scenes.length} scenes in order. Open each scene and drag its hotspots onto the real doorways.` : 'These scenes are already connected in order.', 7000);
+}
+function reachable() {
+  const seen = new Set(), todo = [tour.scenes[0].id];
+  while (todo.length) { const id = todo.pop(); if (seen.has(id)) continue; seen.add(id); links(byId(id) || { hotspots: [] }).forEach(h => byId(h.target) && todo.push(h.target)); }
+  return seen;
+}
 function renderSpots() {
-  const s = scene();
-  if (!s || !s.hotspots.length) { $('hs-list').innerHTML = `<p class="empty">${tour.scenes.length > 1 ? 'No checkpoints here yet. Press “＋ Checkpoint” and pick where it leads.' : 'Checkpoints and info points for the current scene show up here.'}</p>`; return; }
-  $('hs-list').innerHTML = s.hotspots.map((h, i) => h.type === 'scene' ? `<div class="hs-item" data-i="${i}">
-      <div class="row"><b>➜ Checkpoint</b><span><button class="mini" data-look="${i}" title="Show in the panorama">◎</button><button class="mini" data-go="${i}" title="Open that scene">↗</button><button class="mini" data-rm="${i}" title="Delete">×</button></span></div>
-      <label class="field">Leads to<select data-target="${i}">${tour.scenes.filter(x => x.id !== s.id).map(x => `<option value="${x.id}" ${x.id === h.target ? 'selected' : ''}>${escapeHtml(x.title)}</option>`).join('')}</select></label>
-      <label class="field">Label<input data-label="${i}" value="${escapeHtml(h.label || '')}" placeholder="${escapeHtml(byId(h.target)?.title || '')}" maxlength="60"></label></div>`
-    : `<div class="hs-item" data-i="${i}">
-      <div class="row"><b>ⓘ Info point</b><span><button class="mini" data-look="${i}" title="Show in the panorama">◎</button><button class="mini" data-rm="${i}" title="Delete">×</button></span></div>
-      <label class="field">Title<input data-label="${i}" value="${escapeHtml(h.label || '')}" maxlength="60"></label>
-      <label class="field">Text<textarea data-text="${i}" rows="2" maxlength="400">${escapeHtml(h.text || '')}</textarea></label></div>`).join('');
+  const s = scene(); if (!s || panel !== 'hotspot') return;
+  $('hs-tabs').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.tab === hsTab));
+  const rows = s.hotspots.map((h, i) => [h, i]).filter(([h]) => (h.type === 'scene') === (hsTab === 'scene'));
+  $('hs-count').textContent = `${s.hotspots.length}/300`;
+  $('hs-list').innerHTML = rows.map(([h, i]) => `<div class="hrow ${i === openRow ? 'on' : ''}" data-i="${i}">
+      <div class="hrow-top" data-look="${i}">${h.type === 'scene' ? CHEV : INFO}<b>${escapeHtml(linkLabel(h, tour.scenes))}</b><button data-rename="${i}">Rename</button><button data-edit="${i}">Edit</button><button data-rm="${i}">Delete</button></div>
+      ${i !== openRow ? '' : h.type === 'scene'
+        ? `<div class="hrow-edit"><input class="dk" data-label="${i}" value="${escapeHtml(h.label || '')}" placeholder="Label (optional): ${escapeHtml(byId(h.target)?.title || '')}" maxlength="60" aria-label="Label">
+            <select class="dk" data-target="${i}" aria-label="Leads to">${tour.scenes.filter(x => x.id !== s.id).map(x => `<option value="${x.id}" ${x.id === h.target ? 'selected' : ''}>Leads to: ${escapeHtml(x.title)}</option>`).join('')}</select></div>`
+        : `<div class="hrow-edit"><input class="dk" data-label="${i}" value="${escapeHtml(h.label || '')}" placeholder="Title" maxlength="60" aria-label="Title">
+            <textarea class="dk" data-text="${i}" rows="3" maxlength="400" placeholder="Text shown when visitors open this hotspot" aria-label="Text">${escapeHtml(h.text || '')}</textarea></div>`}
+    </div>`).join('');
+  $('hs-note').innerHTML = hsTab === 'scene'
+    ? (tour.scenes.length < 2 ? 'Add another panorama with the + tile in the scene strip, then link them here.'
+      : 'Look toward a doorway and press “Add hotspot”, or drag a scene from the strip onto the view. Drag a hotspot to move it.' + ' <button class="ed-link" id="auto-link">Connect all scenes in order</button>')
+    : 'Text hotspots open a short note, for example a material, a price or a detail worth a closer look.';
 }
-function focusSpot(i, edit = true) {
-  const card = $('hs-list').querySelector(`[data-i="${i}"]`); if (!card) return;
-  $('hs-list').querySelectorAll('.hs-item').forEach(c => c.classList.toggle('on', c === card));
-  card.scrollIntoView({ block: 'nearest' }); if (edit) card.querySelector('input, select')?.focus({ preventScroll: true });
-}
-$('hs-list').addEventListener('click', e => {
-  const s = scene(); const rm = e.target.closest('[data-rm]'), look = e.target.closest('[data-look]'), go = e.target.closest('[data-go]');
-  if (rm) { s.hotspots.splice(+rm.dataset.rm, 1); refreshSpots(); renderScenes(); return touch(); }
-  if (look) { const h = s.hotspots[+look.dataset.look]; return viewer.flyTo(h.yaw, h.pitch); }
-  if (go) return select(s.hotspots[+go.dataset.go].target);
+$('hs-tabs').onclick = e => { const b = e.target.closest('[data-tab]'); if (b) { hsTab = b.dataset.tab; openRow = -1; closePicker(); renderSpots(); } };
+$('hs-add').onclick = () => {
+  if (hsTab === 'scene') return $('picker').hidden ? openPicker() : closePicker();
+  const v = viewer.getView(), s = scene();
+  s.hotspots.push({ type: 'info', yaw: v.yaw, pitch: v.pitch, label: 'Info', text: '' });
+  openRow = s.hotspots.length - 1; refreshSpots(); touch();
+  $('hs-list').querySelector('[data-label]')?.select();
+  tip('Text hotspot added. Drag it into place and write its text in the panel.', 5000);
+};
+$('p-hotspot').addEventListener('click', e => {
+  if (e.target.closest('#auto-link')) return autoLink();
+  const s = scene(), rm = e.target.closest('[data-rm]'), ren = e.target.closest('[data-rename]'), ed = e.target.closest('[data-edit]'), look = e.target.closest('[data-look]');
+  if (rm) { s.hotspots.splice(+rm.dataset.rm, 1); openRow = -1; refreshSpots(); renderSceneGrid(); return touch(); }
+  if (ren || ed) { openRow = +(ren || ed).dataset[ren ? 'rename' : 'edit']; renderSpots(); return $('hs-list').querySelector(ren ? '[data-label]' : '[data-target],[data-text]')?.focus(); }
+  if (look) { const i = +look.dataset.look, h = s.hotspots[i]; viewer.flyTo(h.yaw, h.pitch); openRow = openRow === i ? -1 : i; renderSpots(); }
 });
 $('hs-list').addEventListener('input', e => {
   const s = scene(), t = e.target;
-  if (t.dataset.label !== undefined) s.hotspots[+t.dataset.label].label = t.value;
+  if (t.dataset.label !== undefined) { const h = s.hotspots[+t.dataset.label]; h.label = t.value; t.closest('.hrow').querySelector('b').textContent = linkLabel(h, tour.scenes); }
   if (t.dataset.text !== undefined) s.hotspots[+t.dataset.text].text = t.value;
-  if (t.dataset.target !== undefined) { s.hotspots[+t.dataset.target].target = t.value; renderScenes(); renderSpots(); }
+  if (t.dataset.target !== undefined) { s.hotspots[+t.dataset.target].target = t.value; renderSpots(); renderSceneGrid(); }
   labelSpots(); touch();
 });
 
-// ---------- guide ----------
-function renderGuide() {
-  const n = tour.scenes.length, ok = reachable(), missing = n - ok.size;
-  const steps = [
-    [n > 0, n ? `${n} panorama${n > 1 ? 's' : ''} added` : 'Add your panoramas'],
-    [n > 0 && (n === 1 || missing === 0), n < 2 ? 'Connect scenes with checkpoints' : missing ? `Connect scenes: ${missing} can’t be reached yet` : 'Every scene is connected'],
-    [tour.published && !dirty, tour.published ? (dirty ? 'Publish again to update the live tour' : 'Published') : 'Publish and share the link']
-  ];
-  $('guide').innerHTML = steps.map(([done, text]) => `<li class="${done ? 'done' : ''}">${escapeHtml(text)}</li>`).join('');
+// ---------- initial view ----------
+function syncFov() { const v = Math.round(viewer.fov); $('fov').value = v; $('fov-out').textContent = v; }
+stage.addEventListener('wheel', () => setTimeout(syncFov, 30), { passive: true });
+$('fov').oninput = e => { viewer.fov = +e.target.value; $('fov-out').textContent = e.target.value; };
+$('view-save').onclick = () => { const v = viewer.getView(); Object.assign(scene(), { yaw: v.yaw, pitch: v.pitch, fov: Math.round(v.fov) }); touch(); tip('Opening view saved. Visitors will first see this scene from here.', 3500); };
+$('view-reset').onclick = () => { const s = scene(); s.yaw = 0; s.pitch = 0; delete s.fov; viewer.flyTo(0, 0, 75).then(syncFov); touch(); tip('Opening view restored to the default.', 3000); };
+$('fov-save').onclick = () => {
+  const v = +$('fov').value, all = document.querySelector('[name=fov-scope]:checked').value === 'all';
+  (all ? tour.scenes : [scene()]).forEach(s => s.fov = v); touch();
+  tip(all ? 'Default zoom saved for all scenes.' : 'Default zoom saved for this scene.', 3000);
+};
+$('fov-reset').onclick = () => { viewer.fov = 75; syncFov(); };
+$('fov-cancel').onclick = $('frame-x').onclick = () => { viewer.fov = scene().fov || 75; setPanel(null); };
+
+// ---------- information ----------
+function fillInfo() {
+  $('i-title').value = tour.title || ''; $('i-author').value = tour.author || user?.name || ''; $('i-location').value = tour.location || ''; $('i-desc').value = tour.description || '';
+  $('i-category').value = tour.category || 'Other';
+  document.querySelectorAll('[name=i-vis]').forEach(r => r.checked = r.value === (tour.visibility || 'public'));
+  $('cover').style.backgroundImage = `url('${sceneThumb(coverScene())}')`;
 }
-let tipTimer;
-function tip(text, ms = 4000) { clearTimeout(tipTimer); const t = $('tip'); t.textContent = text; t.hidden = !text; if (text && ms) tipTimer = setTimeout(() => t.hidden = true, ms); }
+function applyInfo() {
+  const title = $('i-title').value.trim(); if (!title) { $('i-title').focus(); toast('The tour needs a title'); return false; }
+  Object.assign(tour, { title, author: $('i-author').value.trim(), location: $('i-location').value.trim(), description: $('i-desc').value.trim(), category: $('i-category').value, visibility: document.querySelector('[name=i-vis]:checked')?.value || 'public' });
+  document.title = title + ' · Edit'; touch(); return true;
+}
+$('i-save').onclick = () => { if (applyInfo()) { $('m-info').classList.remove('open'); toast('Information saved'); } };
+$('cover-change').onclick = () => { if (!applyInfo()) return; $('m-info').classList.remove('open'); openModal('scenes'); toast('Press “Cover” on the scene you want'); };
+$('cover-reset').onclick = () => { delete tour.cover; fillInfo(); touch(); };
+
+// ---------- scenes ----------
+let dragScene = null;
+function renderSceneGrid() {
+  const ok = reachable(), n = tour.scenes.length, cover = coverScene().id;
+  $('sc-count').textContent = `${n}/200`; $('sc-link').hidden = n < 2;
+  $('sgrid').innerHTML = '<div class="scard add"><div class="im" id="sc-add" role="button" tabindex="0"><div><b>+</b>Add scene</div></div></div>'
+    + tour.scenes.map((s, i) => `<div class="scard ${s.id === cur ? 'cur' : ''}" data-id="${s.id}">
+      <div class="im" draggable="true" style="background-image:url('${sceneThumb(s)}')">${i === 0 ? '<span class="first">Start</span>' : ''}${ok.has(s.id) ? '' : '<span class="warn" title="No hotspot leads to this scene yet">No way in</span>'}
+        <div class="bar"><button data-cover="${s.id}">${cover === s.id ? '✓ Cover' : 'Cover'}</button><button data-open="${s.id}">Open</button><button data-del="${s.id}">Delete</button></div></div>
+      <label>Name<input data-rename="${s.id}" value="${escapeHtml(s.title)}" maxlength="60"></label>
+      <label>Order<input type="number" min="1" max="${n}" data-order="${s.id}" value="${i + 1}"></label></div>`).join('');
+}
+function moveScene(id, to) {
+  const from = tour.scenes.findIndex(s => s.id === id); if (from < 0) return;
+  to = Math.max(0, Math.min(tour.scenes.length - 1, to)); if (to === from) return renderSceneGrid();
+  tour.scenes.splice(to, 0, tour.scenes.splice(from, 1)[0]); renderSceneGrid(); renderStrip(); touch();
+}
+const sgrid = $('sgrid');
+sgrid.addEventListener('click', e => {
+  if (e.target.closest('#sc-add')) return $('file').click();
+  const cov = e.target.closest('[data-cover]'), open = e.target.closest('[data-open]'), del = e.target.closest('[data-del]');
+  if (cov) { tour.cover = cov.dataset.cover; renderSceneGrid(); return touch(); }
+  if (open) { $('m-scenes').classList.remove('open'); return select(open.dataset.open); }
+  if (del) {
+    const id = del.dataset.del;
+    if (tour.scenes.length === 1) return toast('A tour needs at least one scene');
+    if (!confirm('Delete this scene and the hotspots that lead to it?')) return;
+    tour.scenes = tour.scenes.filter(s => s.id !== id);
+    tour.scenes.forEach(s => s.hotspots = s.hotspots.filter(h => h.target !== id));
+    if (tour.floorplan) delete tour.floorplan.markers[id];
+    if (tour.cover === id) delete tour.cover;
+    renderSceneGrid(); touch();
+    if (cur === id) select(tour.scenes[0].id); else { renderStrip(); refreshSpots(); }
+  }
+});
+sgrid.addEventListener('input', e => { const s = byId(e.target.dataset.rename); if (s) { s.title = e.target.value; renderStrip(); labelSpots(); touch(); } });
+sgrid.addEventListener('change', e => { if (e.target.dataset.order) moveScene(e.target.dataset.order, (+e.target.value || 1) - 1); });
+sgrid.addEventListener('dragstart', e => { dragScene = e.target.closest('[data-id]')?.dataset.id || null; e.dataTransfer.effectAllowed = 'move'; });
+sgrid.addEventListener('dragover', e => { const c = e.target.closest('[data-id]'); if (!dragScene || !c) return; e.preventDefault(); sgrid.querySelectorAll('.drop').forEach(x => x.classList.remove('drop')); c.classList.add('drop'); });
+sgrid.addEventListener('drop', e => { const c = e.target.closest('[data-id]'); e.preventDefault(); e.stopPropagation(); if (dragScene && c) moveScene(dragScene, tour.scenes.findIndex(s => s.id === c.dataset.id)); dragScene = null; });
+sgrid.addEventListener('dragend', () => { dragScene = null; sgrid.querySelectorAll('.drop').forEach(x => x.classList.remove('drop')); });
+$('sc-link').onclick = () => { autoLink(); toast('Scenes connected in order'); };
 
 // ---------- floor plan ----------
 function renderPlan() {
-  const fp = tour.floorplan, box = $('plan-box');
-  if (!fp) { box.innerHTML = `<label class="btn btn-sm" style="width:100%;justify-content:center">Upload a floor plan<input type="file" id="plan-file" accept="image/jpeg,image/png,image/webp" hidden></label><p class="small" style="margin-top:8px">Visitors get a mini map and can jump between rooms.</p>`; return; }
-  const s = scene();
-  box.innerHTML = `<div class="fplan" id="plan"><img src="${planSrc(fp)}" alt="Floor plan" draggable="false">${tour.scenes.map((x, i) => fp.markers[x.id] ? `<button class="pin ${x.id === cur ? 'on' : ''}" style="left:${fp.markers[x.id].x * 100}%;top:${fp.markers[x.id].y * 100}%" data-pin="${x.id}" title="${escapeHtml(x.title)}">${i + 1}</button>` : '').join('')}</div>
-    <p class="small" style="margin-top:8px">${s ? `Click the plan to place <b>${escapeHtml(s.title)}</b>. ` : ''}${Object.keys(fp.markers).length} of ${tour.scenes.length} scenes placed.</p>
-    <div class="row"><button class="btn btn-sm btn-ghost" id="plan-clear" ${s && fp.markers[s.id] ? '' : 'disabled'}>Remove this marker</button><button class="btn btn-sm btn-ghost" id="plan-remove">Remove plan</button></div>`;
+  const fp = tour.floorplan; if (!byId(planSel)) planSel = cur;
+  $('fp-n').textContent = fp ? '1/1' : '0/1'; $('fp-add').hidden = !!fp; $('fp-delete').disabled = !fp; $('plan-file2').parentElement.hidden = !fp;
+  $('fp-box').innerHTML = fp
+    ? `<div class="fplan" id="plan"><img src="${planSrc(fp)}" alt="Floor plan" draggable="false">${tour.scenes.map((x, i) => fp.markers[x.id] ? `<button class="pin ${x.id === planSel ? 'on' : ''}" style="left:${fp.markers[x.id].x * 100}%;top:${fp.markers[x.id].y * 100}%" data-pin="${x.id}" title="${escapeHtml(x.title)}">${i + 1}</button>` : '').join('')}</div>`
+    : '<label class="fp-drop"><div><b>+</b>Upload a floor plan, site plan or map<br><span class="small">JPG, PNG or WebP</span></div><input type="file" id="plan-file3" accept="image/jpeg,image/png,image/webp" hidden></label>';
+  $('fp-count').textContent = fp ? Object.keys(fp.markers).length : 0;
+  $('fp-points').innerHTML = tour.scenes.map((s, i) => `<button data-p="${s.id}" class="${fp?.markers[s.id] ? 'placed' : ''} ${s.id === planSel ? 'on' : ''}"><i>${i + 1}</i>${escapeHtml(s.title)}</button>`).join('');
+  $('fp-clear').disabled = !fp?.markers[planSel];
 }
-$('plan-box').addEventListener('change', async e => {
-  if (e.target.id !== 'plan-file' || !e.target.files[0]) return;
-  try {
-    const bmp = await createImageBitmap(e.target.files[0]); const k = Math.min(1, 1600 / Math.max(bmp.width, bmp.height));
-    const c = document.createElement('canvas'); c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
-    const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.drawImage(bmp, 0, 0, c.width, c.height);
-    tour.floorplan = { blob: await canvasBlob(c, 'image/jpeg', 0.9), markers: {} }; renderPlan(); touch();
-    tip('Floor plan added. Select a scene, then click its spot on the plan.', 6000);
-  } catch { toast('That image could not be read'); }
+const mPlan = $('m-plan');
+mPlan.addEventListener('change', async e => {
+  const f = e.target.files?.[0]; if (!f || !/^plan-file/.test(e.target.id)) return;
+  try { tour.floorplan = { blob: await processPlan(f), markers: tour.floorplan?.markers || {} }; renderPlan(); touch(); } catch { toast('That image could not be read'); }
+  e.target.value = '';
 });
-$('plan-box').addEventListener('click', e => {
-  const fp = tour.floorplan; if (!fp) return;
-  if (e.target.id === 'plan-remove') { if (confirm('Remove the floor plan?')) { tour.floorplan = null; renderPlan(); touch(); } return; }
-  if (e.target.id === 'plan-clear') { delete fp.markers[cur]; renderPlan(); return touch(); }
-  const pin = e.target.closest('[data-pin]'); if (pin) { if (pin.dataset.pin !== cur) select(pin.dataset.pin); return; }
-  const plan = e.target.closest('#plan'); if (!plan || !scene()) return;
+mPlan.addEventListener('click', e => {
+  const fp = tour.floorplan, p = e.target.closest('[data-p]'), pin = e.target.closest('[data-pin]');
+  if (p) { planSel = p.dataset.p; return renderPlan(); }
+  if (!fp) return;
+  if (e.target.id === 'fp-delete') { if (confirm('Delete the floor plan?')) { tour.floorplan = null; renderPlan(); touch(); } return; }
+  if (e.target.id === 'fp-clear') { delete fp.markers[planSel]; renderPlan(); return touch(); }
+  if (pin) { if (!pin._moved) { planSel = pin.dataset.pin; renderPlan(); } return; }
+  const plan = e.target.closest('#plan'); if (!plan) return;
   const r = plan.getBoundingClientRect();
-  fp.markers[cur] = { x: +((e.clientX - r.left) / r.width).toFixed(4), y: +((e.clientY - r.top) / r.height).toFixed(4) }; renderPlan(); touch();
+  fp.markers[planSel] = { x: +((e.clientX - r.left) / r.width).toFixed(4), y: +((e.clientY - r.top) / r.height).toFixed(4) };
+  const next = tour.scenes.find(s => !fp.markers[s.id]); if (next) planSel = next.id;   // move on to the next scene that has no point yet
+  renderPlan(); touch();
 });
+// drag a point to move it
+mPlan.addEventListener('pointerdown', e => { const pin = e.target.closest('[data-pin]'); if (!pin) return; pin.setPointerCapture(e.pointerId); pin._drag = true; pin._moved = false; });
+mPlan.addEventListener('pointermove', e => {
+  const pin = e.target.closest?.('[data-pin]'); if (!pin?._drag) return;
+  const r = $('plan').getBoundingClientRect(), x = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)), y = Math.max(0, Math.min(1, (e.clientY - r.top) / r.height));
+  pin._moved = true; pin.style.left = x * 100 + '%'; pin.style.top = y * 100 + '%'; tour.floorplan.markers[pin.dataset.pin] = { x: +x.toFixed(4), y: +y.toFixed(4) };
+});
+mPlan.addEventListener('pointerup', e => { const pin = e.target.closest?.('[data-pin]'); if (pin?._drag) { pin._drag = false; if (pin._moved) touch(); } });
 
-// ---------- details ----------
-for (const [id, key] of [['title', 'title'], ['location', 'location'], ['desc', 'description'], ['category', 'category'], ['visibility', 'visibility']]) $(id).addEventListener('input', e => { tour[key] = e.target.value; touch(); });
-function fillDetails() { $('title').value = tour.title || ''; $('location').value = tour.location || ''; $('desc').value = tour.description || ''; $('category').value = tour.category || 'Other'; $('visibility').value = tour.visibility || 'public'; }
-$('file').onchange = e => { addFiles(e.target.files); e.target.value = ''; };
-$('file2').onchange = e => { addFiles(e.target.files); e.target.value = ''; };
-$('sample').onclick = async () => {
-  const names = ['alpine-lake', 'night-sky', 'desert-dusk'];
-  addFiles(await Promise.all(names.map(async n => new File([await (await fetch('assets/pano/' + n + '.jpg')).blob()], n + '.jpg', { type: 'image/jpeg' }))));
+// ---------- browse settings ----------
+function fillBrowse() {
+  const s = settingsOf(tour);
+  $('browse-form').querySelectorAll('[data-s]').forEach(c => c.checked = !!s[c.dataset.s]);
+  document.querySelectorAll('[name=s-dir]').forEach(r => r.checked = +r.value === (s.dir < 0 ? -1 : 1));
+  document.querySelectorAll('[name=s-speed]').forEach(r => r.checked = r.value === s.speed);
+}
+$('browse-save').onclick = () => {
+  const s = {}; $('browse-form').querySelectorAll('[data-s]').forEach(c => s[c.dataset.s] = c.checked);
+  s.dir = +document.querySelector('[name=s-dir]:checked').value; s.speed = document.querySelector('[name=s-speed]:checked').value;
+  tour.settings = s; touch(); $('m-browse').classList.remove('open'); toast('Browse settings saved');
 };
-$('save').onclick = () => tour.scenes.length ? saveNow(false) : toast('Add at least one panorama first');
 
-// ---------- publishing ----------
-$('publish').onclick = publish;
+// ---------- share and publish ----------
+function fillShare(justPublished = false) {
+  $('share-title').textContent = justPublished ? 'Your tour is live' : 'Share';
+  $('share-live').hidden = !tour.published; $('share-draft').hidden = !!tour.published;
+  if (!tour.published) return;
+  const link = tourLink(tour.id);
+  $('s-link').value = link; $('s-embed').value = embedCode(link); $('s-open').href = link; $('qr').innerHTML = qrSvg(link, 4);
+  $('share-note').textContent = tour.pending ? 'You have changes that are not published yet. Press Publish changes to update the live tour.' : tour.visibility === 'unlisted' ? 'Only people with this link can open the tour.' : 'This tour is listed on the Explore page.';
+}
+const copy = async (el, msg) => { if (!await copyText(el.value)) { el.select(); document.execCommand('copy'); } toast(msg); };
+$('s-copy').onclick = () => copy($('s-link'), 'Link copied');
+$('s-copy-embed').onclick = () => copy($('s-embed'), 'Embed code copied');
+$('qr-dl').onclick = () => downloadSvg($('qr').innerHTML, (tour.title || 'tour').replace(/[^\w-]+/g, '-') + '-qr.svg');
+$('share-publish').onclick = () => { $('m-share').classList.remove('open'); publish(); };
+
 async function publish() {
-  if (!tour.scenes.length) return toast('Add at least one panorama first');
-  tour.title = (tour.title || '').trim() || 'Untitled tour'; $('title').value = tour.title;
+  tour.title = (tour.title || '').trim() || 'Untitled tour';
   await saveNow();
   if (!cloudEnabled) return toast('Publishing is not switched on for this site yet. Your tour is saved as a draft in this browser.');
   if (!user) { toast('Create a free account to publish'); return openAuth('signup', 'publish'); }
@@ -286,7 +363,7 @@ async function publish() {
     const todo = tour.scenes.filter(s => !s.image).length; let done = 0;
     for (const s of tour.scenes) {
       if (!s.image) {
-        btn.textContent = `Uploading ${++done} of ${todo}…`;
+        btn.textContent = `Uploading ${++done}/${todo}…`;
         const image = await uploadFile(`${folder}/${s.id}.jpg`, s.blob), thumb = await uploadFile(`${folder}/${s.id}_t.jpg`, s.thumbBlob);
         Object.assign(s, { image, thumb });
       }
@@ -297,56 +374,30 @@ async function publish() {
     if (fp) keep.push(fp.image);
     btn.textContent = 'Publishing…';
     const row = {
-      author: user.name, title: tour.title, description: tour.description || '', location: tour.location || '', category: tour.category || 'Other',
-      visibility: tour.visibility || 'public', cover: tour.scenes[0].thumb, scene_count: tour.scenes.length,
-      data: { scenes: tour.scenes.map(({ id, title, yaw, pitch, hotspots, image, thumb }) => ({ id, title, yaw, pitch, hotspots, image, thumb })), floorplan: fp ? { image: fp.image, markers: fp.markers } : null }
+      author: tour.author || user.name, title: tour.title, description: tour.description || '', location: tour.location || '', category: tour.category || 'Other',
+      visibility: tour.visibility || 'public', cover: coverScene().thumb, scene_count: tour.scenes.length,
+      data: { scenes: tour.scenes.map(({ id, title, yaw, pitch, fov, hotspots, image, thumb }) => ({ id, title, yaw, pitch, fov, hotspots, image, thumb })), floorplan: fp ? { image: fp.image, markers: fp.markers } : null, settings: tour.settings || null }
     };
     if (tour.published) await updateTour(tour.id, row); else await saveNewTour({ id: tour.id, ...row });
-    tour.published = true; tour.owner = user.id;
+    tour.published = true; tour.owner = user.id; tour.pending = false;
     await saveDraft(tour); dirty = false;
     pruneFiles(folder, keep).catch(() => {});
-    const link = new URL('tour.html?t=' + tour.id, location.href).href;
-    $('done-link').value = link; $('done-open').href = link; $('done-modal').classList.add('open');
-    $('status').textContent = 'Published. Changes you make from now on stay in your draft until you publish again.';
-    renderGuide(); renderMine();
-  } catch (e) { toast('Publishing failed: ' + e.message); $('status').textContent = 'Publishing failed: ' + e.message + ' Your draft is safe in this browser.'; }
-  finally { btn.disabled = false; btn.textContent = tour.published ? 'Publish changes' : 'Publish tour'; }
+    fillShare(true); $('m-share').classList.add('open'); markMenu();
+  } catch (e) { toast('Publishing failed: ' + e.message + '. Your draft is safe in this browser.'); }
+  finally { btn.disabled = false; renderStatus(); }
 }
-$('done-copy').onclick = () => navigator.clipboard?.writeText($('done-link').value).then(() => toast('Link copied'), () => { $('done-link').select(); document.execCommand('copy'); toast('Link copied'); });
-document.addEventListener('click', e => { if (e.target.closest('[data-close]')) e.target.closest('.modal').classList.remove('open'); });
-
-// ---------- my tours ----------
-async function renderMine() {
-  const list = await myCards();
-  $('mine').innerHTML = list.length ? list.map(t => `<div class="card">
-      <a class="card-media" href="${tourHref(t)}">${t.cover ? `<img src="${escapeHtml(t.cover)}" alt="">` : ''}<span class="badge">${t.kind === 'draft' ? 'Draft' : t.visibility === 'unlisted' ? 'Unlisted' : 'Public'}</span><span class="badge badge-360">360°</span></a>
-      <div class="card-body"><h3>${escapeHtml(t.title || 'Untitled tour')}</h3><p>${t.sceneCount} scene${t.sceneCount === 1 ? '' : 's'}${t.kind === 'cloud' ? ` · ${(t.views || 0).toLocaleString()} views` : ' · only in this browser'}</p>
-      <div class="row"><a class="btn btn-sm" href="${tourHref(t)}">View</a><a class="btn btn-sm" href="create.html?edit=${t.id}">Edit</a><button class="btn btn-sm btn-ghost" data-delete="${t.id}" data-kind="${t.kind}">Delete</button></div></div></div>`).join('')
-    : `<p class="empty" style="grid-column:1/-1">${cloudEnabled && !user ? 'Log in to see the tours you have published. Drafts you save in this browser show up here too.' : 'Tours you save or publish will show up here.'}</p>`;
-}
-$('mine').onclick = async e => {
-  const b = e.target.closest('[data-delete]'); if (!b) return;
-  if (!confirm(b.dataset.kind === 'cloud' ? 'Delete this tour for everyone? Its link will stop working.' : 'Delete this draft?')) return;
-  try { if (b.dataset.kind === 'cloud') await deleteTour(b.dataset.delete); await deleteDraft(b.dataset.delete); if (b.dataset.delete === tour.id) location.href = 'create.html'; else renderMine(); }
-  catch (err) { toast('Could not delete: ' + err.message); }
-};
 
 // ---------- start ----------
-const editId = new URLSearchParams(location.search).get('edit');
-if (editId) {
-  let loaded = await getDraft(editId).catch(() => null);
-  if (!loaded && cloudEnabled) {
-    const row = await getTourRow(editId).catch(() => null);
-    if (row && user && row.owner === user.id) loaded = { id: row.id, title: row.title, location: row.location, description: row.description, category: row.category, visibility: row.visibility, owner: row.owner, published: true, scenes: row.data?.scenes || [], floorplan: row.data?.floorplan || null };
-    else if (row) toast('You can only edit your own tours');
-  }
-  if (loaded) { tour = { floorplan: null, ...loaded }; tour.scenes.forEach(s => s.hotspots ||= []); if (tour.floorplan) tour.floorplan.markers ||= {}; }
-  else history.replaceState(null, '', 'create.html');
+document.title = (tour.title || 'Untitled tour') + ' · Edit';
+renderStatus(); renderSceneGrid();
+select(tour.scenes[0].id);
+if (q.get('new')) {
+  q.delete('new'); history.replaceState(null, '', 'edit.html?' + q);
+  if (tour.scenes.length > 1) { setPanel('hotspot'); tip('Connect your scenes: look toward a doorway and press “Add hotspot”, or drag a scene from the strip onto the view.', 12000); }
+  else tip('Add more panoramas with the + tile below, then connect them with hotspots.', 9000);
 }
-fillDetails(); showEditor(); renderSpots();
-if (tour.scenes.length) select(tour.scenes[0].id);
-$('publish').textContent = tour.published ? 'Publish changes' : 'Publish tour';
-renderMine();
-if (takeAfterLogin() === 'publish' && user && tour.scenes.length) publish();
+if (location.hash === '#browse') openModal('browse');
+if (location.hash === '#share') openModal('share');
+if (location.hash === '#info') openModal('info');
+if (takeAfterLogin() === 'publish' && user) publish();
 addEventListener('beforeunload', () => { if (dirty) saveDraft(tour); });
-if (location.hash === '#my-tours') setTimeout(() => $('my-tours').scrollIntoView(), 300);

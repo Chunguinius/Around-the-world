@@ -6,9 +6,11 @@ A website for creating, publishing and exploring 360° panoramic virtual tours.
 
 - `index.html` – landing page with a live 360° hero
 - `explore.html` – community tours plus built-in demos, with search and category filters
+- `create.html` – start a tour: title, visibility and the first panoramas
+- `edit.html?id=<id>` – the full-screen editor (tool menu on the right, scene strip along the bottom)
+- `tours.html` – "My virtual tours": rename, privacy, share link, QR code, embed code, delete
 - `tour.html` – full-screen viewer. `?t=<id>` opens a published tour, `?id=<slug>` a demo, `?local=<id>` a draft. Add `&embed=1` for iframes.
-- `create.html` – the editor, plus "My tours"
-- `pricing.html` – plans
+- `pricing.html` – plans (placeholder, no checkout)
 
 ## Viewer controls
 
@@ -19,10 +21,10 @@ A website for creating, publishing and exploring 360° panoramic virtual tours.
 
 ## Building a tour
 
-1. Drop in 2:1 equirectangular panoramas (renders or camera exports).
-2. Connect them with checkpoints: press "＋ Checkpoint" and pick the destination, drag a scene from the list onto the view, or double-click the spot. The way back is added automatically, and "Connect scenes in order" links a whole sequence at once. Drag any checkpoint to fine-tune it.
-3. Optionally upload a floor plan and click it to pin each scene.
-4. Publish. Drafts are saved in the browser as you work.
+1. On Create, name the tour and add 2:1 equirectangular panoramas (renders or camera exports), then press Create.
+2. In the editor, open **Hotspot** and press "Add hotspot" to pick the destination, drag a scene from the strip onto the view, or double-click the spot. The way back is added automatically, and "Connect all scenes in order" links a whole sequence at once. Drag any hotspot to fine-tune it.
+3. **Initial View** sets where each scene opens and its zoom. **Scene** sorts, renames, adds and deletes panoramas and picks the cover. **Floor Plans** pins scenes on a plan. **Browse** controls auto-rotation and which buttons visitors see.
+4. **Publish**. Drafts are saved in the browser as you work.
 
 ## Cloud setup (accounts, shared uploads)
 
