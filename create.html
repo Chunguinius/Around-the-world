@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g'%3E%3Cstop stop-color='%234fd1c5'/%3E%3Cstop offset='1' stop-color='%237c6cff'/%3E%3C/linearGradient%3E%3C/defs%3E%3Ccircle cx='16' cy='16' r='16' fill='url(%23g)'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+<title>Create a tour · Orbit360</title>
+</head>
+<body data-page="create">
+<div class="create-layout">
+  <aside class="panel">
+    <h3>Tour</h3>
+    <label class="field">Title<input id="title" placeholder="My first tour" maxlength="80"></label>
+    <label class="field">Location<input id="location" placeholder="City, venue or address" maxlength="80"></label>
+    <label class="field">Description<textarea id="desc" rows="3" maxlength="300" placeholder="What will visitors see?"></textarea></label>
+    <h3>Scenes</h3>
+    <div class="scene-list" id="scenes"></div>
+    <label class="btn" style="width:100%;justify-content:center">＋ Add panoramas<input type="file" id="file2" accept="image/*" multiple hidden></label>
+    <p class="small" style="margin-top:12px">Use 2:1 equirectangular images (JPG, PNG or WebP).</p>
+  </aside>
+  <div class="stage" id="stage">
+    <div class="mode-bar" id="modes" hidden>
+      <button data-m="view" class="on">👁 View</button><button data-m="scene">➜ Scene link</button><button data-m="info">ⓘ Info point</button><button data-m="start">◎ Set start view</button>
+    </div>
+    <div class="dropzone" id="drop">
+      <div>
+        <div style="font-size:3rem">🌐</div>
+        <h2>Drop your 360° panoramas here</h2>
+        <p>Or pick files from your device. Everything stays in your browser.</p>
+        <div class="cta-row" style="justify-content:center">
+          <label class="btn btn-primary">Choose files<input type="file" id="file" accept="image/*" multiple hidden></label>
+          <button class="btn" id="sample">Use sample images</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <aside class="panel right">
+    <h3>Hotspots in this scene</h3>
+    <div id="hs-list"><p class="empty">Pick “Scene link” or “Info point”, then click in the panorama.</p></div>
+    <div style="display:grid;gap:10px;margin-top:24px">
+      <button class="btn btn-primary" id="save" style="justify-content:center">Save tour</button>
+      <button class="btn" id="preview" style="justify-content:center">Save and preview</button>
+    </div>
+    <p class="small" style="margin-top:12px">Tours are saved in this browser. Cloud publishing comes with accounts.</p>
+  </aside>
+</div>
+
+<section class="block container" id="my-tours" style="padding:80px 0">
+  <div class="section-head" style="text-align:left;margin:0 0 32px"><span class="eyebrow">Library</span><h2>My tours</h2></div>
+  <div class="grid" id="mine"></div>
+</section>
+
+<div class="modal" id="hs-modal"><div class="modal-box">
+  <button class="modal-close" onclick="this.closest('.modal').classList.remove('open')">×</button>
+  <h3 id="hs-title">New hotspot</h3>
+  <form id="hs-form">
+    <label class="field">Label<input name="label" required maxlength="60"></label>
+    <label class="field" id="hs-target-f">Goes to scene<select name="target"></select></label>
+    <label class="field" id="hs-text-f">Text<textarea name="text" rows="3" maxlength="400"></textarea></label>
+    <button class="btn btn-primary" type="submit" style="width:100%;justify-content:center">Add hotspot</button>
+  </form>
+</div></div>
+
+<script type="module">
+  import { toast } from './js/layout.js';
+  import { PanoViewer, escapeHtml } from './js/viewer.js';
+  import { saveTour, getLocalTour, listLocalTours, deleteLocalTour, hydrate } from './js/db.js';
+
+  const $ = id => document.getElementById(id);
+  const uid = () => Math.random().toString(36).slice(2, 10);
+  let tour = { id: uid(), title: '', location: '', description: '', author: 'You', category: 'My tour', scenes: [] };
+  let cur = null, mode = 'view', pending = null, viewer = null;
+  const urls = new Map(); // scene id -> object URLs
+  const sceneUrl = s => { if (!urls.has(s.id)) urls.set(s.id, { src: URL.createObjectURL(s.blob), thumb: URL.createObjectURL(s.thumb) }); return urls.get(s.id); };
+
+  function ensureViewer() {
+    if (viewer) return;
+    viewer = new PanoViewer($('stage'), { autoRotate: 0 });
+    viewer.on('click', p => {
+      if (mode === 'scene' || mode === 'info') openHsModal(p);
+    });
+    viewer.on('hotspot', h => toast(h.type === 'scene' ? 'Links to: ' + (tour.scenes.find(s => s.id === h.target)?.title || '?') : h.label));
+  }
+
+  async function processFile(file) {
+    const bmp = await createImageBitmap(file);
+    if (Math.abs(bmp.width / bmp.height - 2) > 0.15) toast(file.name + ' is not 2:1, it may look stretched');
+    const gl = document.createElement('canvas').getContext('webgl');
+    const maxW = Math.min(gl ? gl.getParameter(gl.MAX_TEXTURE_SIZE) : 4096, 8192);
+    const w = Math.min(bmp.width, maxW), h = Math.round(w / 2);
+    const c = document.createElement('canvas'); c.width = w; c.height = h; c.getContext('2d').drawImage(bmp, 0, 0, w, h);
+    const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.9));
+    const t = document.createElement('canvas'); t.width = 480; t.height = 270;
+    t.getContext('2d').drawImage(bmp, bmp.width * .25, bmp.height * .2, bmp.width * .5, bmp.height * .6, 0, 0, 480, 270);
+    const thumb = await new Promise(r => t.toBlob(r, 'image/jpeg', 0.8));
+    return { id: uid(), title: file.name.replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' ').slice(0, 40) || 'Scene', blob, thumb, yaw: 0, pitch: 0, hotspots: [] };
+  }
+
+  async function addFiles(files) {
+    const imgs = [...files].filter(f => f.type.startsWith('image/'));
+    if (!imgs.length) return toast('Please choose image files');
+    toast('Processing ' + imgs.length + ' image' + (imgs.length > 1 ? 's' : '') + '…');
+    for (const f of imgs) { try { tour.scenes.push(await processFile(f)); } catch (e) { toast('Could not read ' + f.name); } }
+    if (!tour.title && tour.scenes[0]) $('title').value = tour.title = tour.scenes[0].title;
+    showEditor(); select(cur || tour.scenes[0].id);
+  }
+
+  function showEditor() { $('drop').hidden = tour.scenes.length > 0; $('modes').hidden = !tour.scenes.length; if (tour.scenes.length) ensureViewer(); renderScenes(); }
+
+  function renderScenes() {
+    $('scenes').innerHTML = tour.scenes.length ? tour.scenes.map((s, i) => `<div class="scene-item ${s.id === cur ? 'on' : ''}" data-id="${s.id}">
+      <img src="${sceneUrl(s).thumb}" alt=""><input value="${escapeHtml(s.title)}" data-rename="${s.id}" aria-label="Scene name">
+      <button class="x" data-del="${s.id}" title="Remove scene">×</button></div>`).join('') : '<p class="empty">No scenes yet.</p>';
+  }
+  $('scenes').addEventListener('click', e => {
+    const d = e.target.closest('[data-del]');
+    if (d) { tour.scenes = tour.scenes.filter(s => s.id !== d.dataset.del); tour.scenes.forEach(s => s.hotspots = s.hotspots.filter(h => h.target !== d.dataset.del)); if (cur === d.dataset.del) cur = null; showEditor(); if (tour.scenes[0]) select(cur || tour.scenes[0].id); return; }
+    const it = e.target.closest('[data-id]'); if (it && !e.target.matches('input')) select(it.dataset.id);
+  });
+  $('scenes').addEventListener('input', e => { const s = tour.scenes.find(x => x.id === e.target.dataset.rename); if (s) s.title = e.target.value; });
+
+  function select(id) {
+    cur = id; const s = tour.scenes.find(x => x.id === id); if (!s) return;
+    renderScenes(); viewer.load(sceneUrl(s).src, { yaw: s.yaw, pitch: s.pitch, hotspots: s.hotspots }); renderHs();
+  }
+  const scene = () => tour.scenes.find(x => x.id === cur);
+
+  function renderHs() {
+    const s = scene(); if (!s) return;
+    $('hs-list').innerHTML = s.hotspots.length ? s.hotspots.map((h, i) => `<div class="hs-item"><div class="row"><b>${h.type === 'scene' ? '➜' : 'ⓘ'} ${escapeHtml(h.label)}</b><button class="x" style="background:none;border:0;color:var(--muted);cursor:pointer" data-rm="${i}">×</button></div>
+      <span class="small">${h.type === 'scene' ? 'to ' + escapeHtml(tour.scenes.find(x => x.id === h.target)?.title || '?') : escapeHtml(h.text || '')}</span></div>`).join('')
+      : '<p class="empty">Pick “Scene link” or “Info point”, then click in the panorama.</p>';
+  }
+  $('hs-list').onclick = e => { const b = e.target.closest('[data-rm]'); if (b) { scene().hotspots.splice(+b.dataset.rm, 1); viewer.setHotspots(scene().hotspots); renderHs(); } };
+
+  $('modes').onclick = e => {
+    const b = e.target.closest('[data-m]'); if (!b) return;
+    if (b.dataset.m === 'start') { const v = viewer.getView(); Object.assign(scene(), { yaw: v.yaw, pitch: v.pitch }); return toast('Start view saved for this scene'); }
+    if (b.dataset.m === 'scene' && tour.scenes.length < 2) return toast('Add a second panorama to link scenes');
+    mode = b.dataset.m; $('modes').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
+    if (mode !== 'view') toast('Click in the panorama to place it');
+  };
+
+  function openHsModal(p) {
+    pending = { ...p, type: mode };
+    const f = $('hs-form'); f.reset();
+    $('hs-title').textContent = mode === 'scene' ? 'New scene link' : 'New info point';
+    $('hs-target-f').hidden = mode !== 'scene'; $('hs-text-f').hidden = mode !== 'info';
+    f.target.innerHTML = tour.scenes.filter(s => s.id !== cur).map(s => `<option value="${s.id}">${escapeHtml(s.title)}</option>`).join('');
+    if (mode === 'scene') f.label.value = 'Go to ' + (tour.scenes.find(s => s.id !== cur)?.title || '');
+    f.target.onchange = () => f.label.value = 'Go to ' + f.target.selectedOptions[0].text;
+    $('hs-modal').classList.add('open'); setTimeout(() => f.label.focus(), 50);
+  }
+  $('hs-form').onsubmit = e => {
+    e.preventDefault(); const f = e.target;
+    const h = { type: pending.type, yaw: pending.yaw, pitch: pending.pitch, label: f.label.value.trim() };
+    if (h.type === 'scene') h.target = f.target.value; else h.text = f.text.value.trim();
+    scene().hotspots.push(h); viewer.setHotspots(scene().hotspots); renderHs(); $('hs-modal').classList.remove('open');
+  };
+
+  ['title', 'location'].forEach(k => $(k).oninput = e => tour[k] = e.target.value);
+  $('desc').oninput = e => tour.description = e.target.value;
+  $('file').onchange = e => addFiles(e.target.files); $('file2').onchange = e => addFiles(e.target.files);
+  const drop = $('stage');
+  drop.addEventListener('dragover', e => { e.preventDefault(); $('drop').classList.add('over'); });
+  drop.addEventListener('dragleave', () => $('drop').classList.remove('over'));
+  drop.addEventListener('drop', e => { e.preventDefault(); $('drop').classList.remove('over'); addFiles(e.dataTransfer.files); });
+  $('sample').onclick = async () => {
+    const names = ['alpine-lake', 'night-sky'];
+    const files = await Promise.all(names.map(async n => new File([await (await fetch('assets/pano/' + n + '.jpg')).blob()], n + '.jpg', { type: 'image/jpeg' })));
+    addFiles(files);
+  };
+
+  async function save() {
+    if (!tour.scenes.length) { toast('Add at least one panorama first'); return false; }
+    tour.title = tour.title.trim() || 'Untitled tour'; tour.updated = Date.now();
+    try { await saveTour(tour); toast('Tour saved'); renderMine(); return true; } catch (e) { toast('Saving failed: ' + e.message); return false; }
+  }
+  $('save').onclick = save;
+  $('preview').onclick = async () => { if (await save()) location.href = 'tour.html?local=' + tour.id; };
+
+  async function renderMine() {
+    const list = (await listLocalTours().catch(() => [])).sort((a, b) => b.updated - a.updated);
+    $('mine').innerHTML = list.length ? list.map(t => { const h = hydrate({ ...t, scenes: t.scenes.slice(0, 1) }); return `<div class="card">
+      <a class="card-media" href="tour.html?local=${t.id}"><img src="${h.cover}" alt=""><span class="badge">${t.scenes.length} scene${t.scenes.length > 1 ? 's' : ''}</span><span class="badge badge-360">360°</span></a>
+      <div class="card-body"><h3>${escapeHtml(t.title)}</h3><p>${escapeHtml(t.description || t.location || '')}</p>
+      <div class="row"><a class="btn btn-sm" href="tour.html?local=${t.id}">View</a><a class="btn btn-sm" href="create.html?edit=${t.id}">Edit</a><button class="btn btn-sm btn-ghost" data-delete="${t.id}">Delete</button></div></div></div>`; }).join('')
+      : '<p class="empty" style="grid-column:1/-1">Tours you save will show up here.</p>';
+  }
+  $('mine').onclick = async e => { const b = e.target.closest('[data-delete]'); if (b && confirm('Delete this tour?')) { await deleteLocalTour(b.dataset.delete); renderMine(); } };
+
+  const editId = new URLSearchParams(location.search).get('edit');
+  if (editId) {
+    const t = await getLocalTour(editId).catch(() => null);
+    if (t) { tour = t; $('title').value = t.title; $('location').value = t.location || ''; $('desc').value = t.description || ''; showEditor(); select(t.scenes[0]?.id); }
+  }
+  renderScenes(); renderMine();
+</script>
+</body></html>

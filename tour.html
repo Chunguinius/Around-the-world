@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g'%3E%3Cstop stop-color='%234fd1c5'/%3E%3Cstop offset='1' stop-color='%237c6cff'/%3E%3C/linearGradient%3E%3C/defs%3E%3Ccircle cx='16' cy='16' r='16' fill='url(%23g)'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+<title>Tour · Orbit360</title>
+</head>
+<body class="tour-page">
+<div class="tour-shell">
+  <div id="viewer"></div>
+  <div class="tour-top">
+    <a class="icon-btn" href="explore.html" id="back" title="Back to Explore">←</a>
+    <div class="tour-title"><h1 id="t-title">Loading…</h1><span id="t-sub"></span></div>
+    <a class="logo" href="index.html" id="brand" style="margin-left:auto;font-size:1rem"><span class="logo-mark" style="width:24px;height:24px"></span>Orbit360</a>
+  </div>
+  <div class="tour-controls">
+    <button class="icon-btn on" id="b-rotate" title="Auto-rotate">⟲</button>
+    <button class="icon-btn" id="b-in" title="Zoom in">＋</button>
+    <button class="icon-btn" id="b-out" title="Zoom out">－</button>
+    <button class="icon-btn" id="b-gyro" title="Use device motion">📱</button>
+    <button class="icon-btn" id="b-full" title="Fullscreen">⛶</button>
+    <button class="icon-btn" id="b-share" title="Share">⤴</button>
+  </div>
+  <div class="info-pop" id="info"><button class="modal-close" style="top:6px;right:10px" onclick="this.parentElement.classList.remove('open')">×</button><h3 id="i-title"></h3><p id="i-text" style="margin:0"></p></div>
+  <div class="scene-strip" id="strip"></div>
+</div>
+
+<div class="modal" id="share-modal"><div class="modal-box share-box">
+  <button class="modal-close" onclick="this.closest('.modal').classList.remove('open')">×</button>
+  <h3>Share this tour</h3>
+  <div id="qr"></div>
+  <label class="field">Link<div class="row"><input id="s-link" readonly><button class="btn btn-sm" data-copy="s-link">Copy</button></div></label>
+  <label class="field">Embed code<textarea id="s-embed" readonly></textarea></label>
+  <div class="row"><button class="btn btn-sm" data-copy="s-embed">Copy embed</button><a class="btn btn-sm" id="s-x" target="_blank" rel="noopener">Post on X</a><a class="btn btn-sm" id="s-fb" target="_blank" rel="noopener">Facebook</a></div>
+  <p class="small" id="s-note" style="margin-top:1em"></p>
+</div></div>
+
+<script src="js/vendor/qrcode.js"></script>
+<script type="module">
+  import { toast } from './js/layout.js';
+  import { PanoViewer, escapeHtml } from './js/viewer.js';
+  import { getTour } from './js/data.js';
+  import { getLocalTour, hydrate } from './js/db.js';
+
+  const params = new URLSearchParams(location.search);
+  const embed = params.has('embed');
+  let tour = params.get('local') ? await getLocalTour(params.get('local')).then(t => t && hydrate(t)) : getTour(params.get('id') || 'lakeside-retreat');
+  if (!tour) { document.getElementById('t-title').textContent = 'Tour not found'; throw new Error('missing tour'); }
+  if (embed) { document.getElementById('back').hidden = true; }
+  else document.getElementById('brand').hidden = true;
+  document.title = tour.title + ' · Orbit360';
+  document.getElementById('t-title').textContent = tour.title;
+  document.getElementById('t-sub').textContent = [tour.location, tour.author && 'by ' + tour.author].filter(Boolean).join(' · ');
+
+  const viewer = new PanoViewer(document.getElementById('viewer'), { autoRotate: 0.04 });
+  let current;
+  const strip = document.getElementById('strip');
+  strip.hidden = tour.scenes.length < 2;
+  strip.innerHTML = tour.scenes.map(s => `<button data-s="${s.id}"><img src="${s.thumbUrl || s.src.replace('/pano/', '/thumbs/')}" alt=""><span>${escapeHtml(s.title)}</span></button>`).join('');
+  strip.onclick = e => { const b = e.target.closest('[data-s]'); if (b) go(b.dataset.s); };
+
+  function go(id) {
+    const s = tour.scenes.find(x => x.id === id) || tour.scenes[0];
+    current = s.id; document.getElementById('info').classList.remove('open');
+    strip.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.s === s.id));
+    viewer.load(s.src, { yaw: s.yaw || 0, pitch: s.pitch || 0, hotspots: s.hotspots || [] });
+    const u = new URL(location); u.searchParams.set('scene', s.id); history.replaceState(null, '', u);
+  }
+  viewer.on('hotspot', h => {
+    if (h.type === 'scene') return go(h.target);
+    document.getElementById('i-title').textContent = h.label; document.getElementById('i-text').textContent = h.text || '';
+    document.getElementById('info').classList.add('open');
+  });
+  go(params.get('scene') || tour.scenes[0].id);
+
+  const rot = document.getElementById('b-rotate');
+  rot.onclick = () => { const on = !rot.classList.contains('on'); rot.classList.toggle('on', on); viewer.setAutoRotate(on ? 0.04 : 0); };
+  document.getElementById('b-in').onclick = () => viewer.zoom(-10);
+  document.getElementById('b-out').onclick = () => viewer.zoom(10);
+  document.getElementById('b-gyro').onclick = () => {
+    if (!('DeviceOrientationEvent' in window) || !matchMedia('(pointer:coarse)').matches) return toast('Device motion works on phones and tablets');
+    viewer.enableGyro().then(ok => toast(ok ? 'Tilt your device to look around' : 'Motion access denied'));
+  };
+  document.getElementById('b-full').onclick = () => document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen?.();
+  addEventListener('keydown', e => { if (e.key === 'f') document.getElementById('b-full').click(); });
+
+  document.getElementById('b-share').onclick = () => {
+    const u = new URL(location); u.searchParams.delete('embed');
+    const link = u.href, em = new URL(u); em.searchParams.set('embed', '1');
+    document.getElementById('s-link').value = link;
+    document.getElementById('s-embed').value = `<iframe src="${em.href}" width="100%" height="480" style="border:0;border-radius:12px" allow="fullscreen; gyroscope; accelerometer" allowfullscreen loading="lazy"></iframe>`;
+    document.getElementById('s-x').href = 'https://twitter.com/intent/tweet?url=' + encodeURIComponent(link) + '&text=' + encodeURIComponent(tour.title + ' in 360°');
+    document.getElementById('s-fb').href = 'https://www.facebook.com/sharer/sharer.php?u=' + encodeURIComponent(link);
+    document.getElementById('s-note').textContent = tour.local ? 'This tour is saved in this browser only, so the link works on this device. Publishing to the cloud is a PRO feature planned for a later release.' : '';
+    if (window.qrcode) { const q = qrcode(0, 'M'); q.addData(link); q.make(); document.getElementById('qr').innerHTML = q.createSvgTag(4, 0); }
+    document.getElementById('share-modal').classList.add('open');
+  };
+  document.querySelectorAll('[data-copy]').forEach(b => b.onclick = e => {
+    e.preventDefault(); const el = document.getElementById(b.dataset.copy);
+    navigator.clipboard?.writeText(el.value).then(() => toast('Copied'), () => { el.select(); document.execCommand('copy'); toast('Copied'); });
+  });
+</script>
+</body></html>

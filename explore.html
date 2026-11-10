@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g'%3E%3Cstop stop-color='%234fd1c5'/%3E%3Cstop offset='1' stop-color='%237c6cff'/%3E%3C/linearGradient%3E%3C/defs%3E%3Ccircle cx='16' cy='16' r='16' fill='url(%23g)'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+<title>Explore tours · Orbit360</title>
+</head>
+<body data-page="explore">
+<main class="container">
+  <div class="page-hero">
+    <span class="eyebrow">Explore</span>
+    <h1>Discover 360° tours</h1>
+    <p>Hotels, trails, venues and travel stories from the community.</p>
+    <div class="searchbar"><input id="q" type="search" placeholder="Search tours, places or creators"></div>
+    <div class="chips" id="cats" style="justify-content:center;margin-top:20px"></div>
+  </div>
+  <div class="grid" id="grid" style="margin-bottom:80px"></div>
+  <p id="none" class="empty" hidden>No tours match that search.</p>
+</main>
+<script type="module">
+  import './js/layout.js';
+  import { TOURS } from './js/data.js';
+  import { cardHTML } from './js/cards.js';
+  const cats = ['All', ...new Set(TOURS.map(t => t.category))];
+  let cat = 'All';
+  const catsEl = document.getElementById('cats'), q = document.getElementById('q');
+  const render = () => {
+    const s = q.value.trim().toLowerCase();
+    const list = TOURS.filter(t => (cat === 'All' || t.category === cat) && (!s || [t.title, t.location, t.author, t.description].join(' ').toLowerCase().includes(s)));
+    document.getElementById('grid').innerHTML = list.map(cardHTML).join('');
+    document.getElementById('none').hidden = list.length > 0;
+    catsEl.innerHTML = cats.map(c => `<button class="chip ${c === cat ? 'active' : ''}" data-c="${c}">${c}</button>`).join('');
+  };
+  catsEl.onclick = e => { const b = e.target.closest('[data-c]'); if (b) { cat = b.dataset.c; render(); } };
+  q.oninput = render; render();
+</script>
+</body></html>
