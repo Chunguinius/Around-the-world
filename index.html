@@ -2,6 +2,7 @@
 <html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23e1ff15'/%3E%3Cg fill='none' stroke='%2316181d' stroke-width='2.2'%3E%3Ccircle cx='16' cy='16' r='8'/%3E%3Cpath d='M8 16h16M16 8c3 3 3 13 0 16M16 8c-3 3-3 13 0 16'/%3E%3C/g%3E%3C/svg%3E">
+<link rel="manifest" href="manifest.webmanifest"><meta name="theme-color" content="#222834"><link rel="apple-touch-icon" href="assets/icon-192.png">
 <link rel="stylesheet" href="css/style.css">
 <title>Free 360° virtual tour builder · Around the World</title>
 </head>
@@ -96,8 +97,8 @@
         <span class="eyebrow">Any device</span>
         <h2>Works on every screen</h2>
         <p>Visitors drag with a mouse, swipe or tilt a phone, and walk from room to room with W, A, S and D on a keyboard.</p>
-        <p>Nothing to install. Tours open in the browser on computers, tablets, phones and headsets.</p>
-        <a class="btn" href="explore.html">Explore demos</a>
+        <p>Tours open in the browser on computers, tablets, phones and headsets, and there is an Android app for building tours on the go.</p>
+        <div class="cta-row" style="justify-content:flex-start"><a class="btn" href="explore.html">Explore demos</a><a class="btn btn-primary" id="get-app" hidden>Get the Android app</a></div>
       </div>
     </div>
   </div></section>
@@ -138,7 +139,7 @@
 </main>
 <script src="js/vendor/qrcode.js"></script>
 <script type="module">
-  import './js/layout.js';
+  import { APK_URL, inApp } from './js/layout.js';
   import { PanoViewer } from './js/viewer.js';
   import { demoCards } from './js/tours.js';
   import { cardHTML } from './js/cards.js';
@@ -159,6 +160,7 @@
   const seen = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { e.target.classList.add('in'); seen.unobserve(e.target); } }), { rootMargin: '0px 0px -8% 0px' });
   document.querySelectorAll('.feature, .section-head, .step, .pro-cta, .faq, .stats-grid').forEach(el => { el.classList.add('reveal'); seen.observe(el); });
   document.getElementById('demo-grid').innerHTML = demoCards().slice(0, 3).map(cardHTML).join('');
+  if (!inApp) { const a = document.getElementById('get-app'); a.href = APK_URL; a.hidden = false; }
   document.getElementById('demo-qr').innerHTML = qrSvg(new URL('tour.html?id=lakeside-retreat', location.href).href, 3);
 </script>
 </body>

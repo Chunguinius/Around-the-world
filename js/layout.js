@@ -3,6 +3,11 @@ import { cloudEnabled, currentUser, displayName, signIn, signUp, signOut, resetP
 import { escapeHtml } from './viewer.js';
 
 const BRAND = 'Around the World';
+// the Android app is built by the repository's workflow and attached to this release
+export const APK_URL = 'https://github.com/Chunguinius/Around-the-world/releases/download/android-latest/around-the-world.apk';
+// install links stay hidden inside the app itself, and until the first build has been published
+const APK_PUBLISHED = false;
+export const inApp = /AroundTheWorldApp/.test(navigator.userAgent) || !APK_PUBLISHED;
 const page = document.body.dataset.page || '';
 const store = {
   get(k, d) { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } },
@@ -79,7 +84,7 @@ function footer() {
     <div class="footer-grid">
       <div>${logoHTML()}
         <p style="margin-top:1em;max-width:300px">Build 360° tours from your panoramas and renders, then share them with a link.</p></div>
-      <div><h4>Product</h4><ul><li><a href="index.html">Home</a></li><li><a href="explore.html">Explore</a></li><li><a href="create.html">Create a tour</a></li><li><a href="tours.html">My virtual tours</a></li><li><a href="pricing.html">Pricing</a></li></ul></div>
+      <div><h4>Product</h4><ul><li><a href="index.html">Home</a></li><li><a href="explore.html">Explore</a></li><li><a href="create.html">Create a tour</a></li><li><a href="tours.html">My virtual tours</a></li><li><a href="pricing.html">Pricing</a></li>${inApp ? '' : `<li><a href="${APK_URL}">Android app</a></li>`}</ul></div>
       <div><h4>Support</h4><ul><li><a href="index.html#how">How it works</a></li><li><a href="index.html#faq">FAQ</a></li><li><a href="tour.html?id=lakeside-retreat">Live demo</a></li></ul></div>
       <div><h4>Legal</h4><ul><li><a href="#" data-soon>Terms</a></li><li><a href="#" data-soon>Privacy</a></li><li><a href="#" data-soon>Contact</a></li></ul></div>
     </div>
