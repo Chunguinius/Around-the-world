@@ -6,7 +6,7 @@ const BRAND = 'Around the World';
 // the Android app is built by the repository's workflow and attached to this release
 export const APK_URL = 'https://github.com/Chunguinius/Around-the-world/releases/download/android-latest/around-the-world.apk';
 // install links stay hidden inside the app itself, and until the first build has been published
-const APK_PUBLISHED = false;
+const APK_PUBLISHED = true;
 export const inApp = /AroundTheWorldApp/.test(navigator.userAgent) || !APK_PUBLISHED;
 const page = document.body.dataset.page || '';
 const store = {
