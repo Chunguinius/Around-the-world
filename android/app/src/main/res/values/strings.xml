@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Around the World</string>
+    <!-- The website the app shows. Change both lines (and the host in AndroidManifest.xml) if the site moves. -->
+    <string name="start_url" translatable="false">https://around-the-world-five-sigma.vercel.app/</string>
+    <string name="site_host" translatable="false">around-the-world-five-sigma.vercel.app</string>
+    <string name="offline_title">No connection</string>
+    <string name="offline_text">Around the World needs the internet to load tours. Check your connection and try again.</string>
+    <string name="offline_retry">Try again</string>
+    <string name="choose_panoramas">Choose images</string>
+    <string name="no_file_picker">No app on this device can pick files</string>
+</resources>
